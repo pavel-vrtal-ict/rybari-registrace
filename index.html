@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rybářské závody</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>🐟 Rybářské závody</h1>
+            <p class="subtitle">Registrace a organizace závodů</p>
+        </div>
+    </header>
+
+    <nav id="main-nav">
+        <button class="nav-btn active" data-view="competitions">
+            <span class="nav-icon">🏆</span>
+            <span class="nav-label">Závody</span>
+        </button>
+        <button class="nav-btn" data-view="registration">
+            <span class="nav-icon">📝</span>
+            <span class="nav-label">Registrace</span>
+        </button>
+        <button class="nav-btn" data-view="results">
+            <span class="nav-icon">📊</span>
+            <span class="nav-label">Výsledky</span>
+        </button>
+    </nav>
+
+    <main id="app">
+        <!-- ZÁVODY -->
+        <section id="view-competitions" class="view active">
+            <div class="section-header">
+                <h2>Nadcházející závody</h2>
+                <button class="btn btn-primary" id="btn-new-competition">+ Nový závod</button>
+            </div>
+
+            <div id="competitions-list" class="card-list"></div>
+            <div id="no-competitions" class="empty-state">
+                <span class="empty-icon">🎣</span>
+                <p>Zatím nemáte žádné závody.</p>
+                <p class="hint">Klikněte na „+ Nový závod" pro vytvoření.</p>
+            </div>
+        </section>
+
+        <!-- REGISTRACE -->
+        <section id="view-registration" class="view">
+            <div class="section-header">
+                <h2>Registrace závodníka</h2>
+            </div>
+
+            <div id="no-competition-for-reg" class="empty-state">
+                <span class="empty-icon">📋</span>
+                <p>Nejdříve vytvořte závod.</p>
+            </div>
+
+            <form id="registration-form" class="form-card" style="display:none;">
+                <div class="form-group">
+                    <label for="reg-competition">Závod</label>
+                    <select id="reg-competition" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="reg-name">Jméno a příjmení</label>
+                    <input type="text" id="reg-name" placeholder="Jan Novák" required>
+                </div>
+                <div class="form-group">
+                    <label for="reg-club">Rybářský spolek / oddíl</label>
+                    <input type="text" id="reg-club" placeholder="MO ČRS Třebíč">
+                </div>
+                <div class="form-group">
+                    <label for="reg-phone">Telefon</label>
+                    <input type="tel" id="reg-phone" placeholder="+420 123 456 789">
+                </div>
+                <div class="form-group">
+                    <label for="reg-email">E-mail</label>
+                    <input type="email" id="reg-email" placeholder="jan@email.cz">
+                </div>
+                <div class="form-group">
+                    <label for="reg-category">Kategorie</label>
+                    <select id="reg-category">
+                        <option value="dospeli">Dospělí</option>
+                        <option value="mladez">Mládež (do 18 let)</option>
+                        <option value="deti">Děti (do 12 let)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="reg-note">Poznámka</label>
+                    <textarea id="reg-note" rows="2" placeholder="Volitelná poznámka..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Zaregistrovat</button>
+            </form>
+        </section>
+
+        <!-- VÝSLEDKY -->
+        <section id="view-results" class="view">
+            <div class="section-header">
+                <h2>Registrovaní závodníci</h2>
+            </div>
+
+            <div id="results-controls" style="display:none;">
+                <div class="form-group">
+                    <label for="results-competition">Závod</label>
+                    <select id="results-competition"></select>
+                </div>
+                <div class="results-stats" id="results-stats"></div>
+            </div>
+
+            <div id="participants-list" class="participants-table-wrap"></div>
+
+            <div id="no-participants" class="empty-state">
+                <span class="empty-icon">👥</span>
+                <p>Zatím žádní registrovaní závodníci.</p>
+            </div>
+
+            <div id="results-actions" style="display:none;">
+                <button class="btn btn-secondary" id="btn-export-csv">📥 Export CSV</button>
+                <button class="btn btn-secondary" id="btn-print">🖨️ Tisk</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- MODAL: Nový závod -->
+    <div id="modal-competition" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-competition-title">Nový závod</h3>
+                <button class="modal-close" id="modal-close-competition">&times;</button>
+            </div>
+            <form id="competition-form">
+                <div class="form-group">
+                    <label for="comp-name">Název závodu</label>
+                    <input type="text" id="comp-name" placeholder="Pohár starosty 2026" required>
+                </div>
+                <div class="form-group">
+                    <label for="comp-date">Datum</label>
+                    <input type="date" id="comp-date" required>
+                </div>
+                <div class="form-group">
+                    <label for="comp-time">Čas zahájení</label>
+                    <input type="time" id="comp-time" value="07:00">
+                </div>
+                <div class="form-group">
+                    <label for="comp-location">Místo konání</label>
+                    <input type="text" id="comp-location" placeholder="Rybník Velký, Třebíč" required>
+                </div>
+                <div class="form-group">
+                    <label for="comp-max">Max. počet závodníků</label>
+                    <input type="number" id="comp-max" min="1" value="50">
+                </div>
+                <div class="form-group">
+                    <label for="comp-desc">Popis / pravidla</label>
+                    <textarea id="comp-desc" rows="3" placeholder="Pravidla závodu, povolené nástrahy..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full" id="btn-save-competition">Uložit závod</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Detail závodu -->
+    <div id="modal-detail" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Detail závodu</h3>
+                <button class="modal-close" id="modal-close-detail">&times;</button>
+            </div>
+            <div id="competition-detail-body"></div>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
