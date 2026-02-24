@@ -11,6 +11,13 @@ const MAX_LEN   = 60;
 
 const BASE_URL  = 'https://pavel-vrtal-ict.github.io/rybari-registrace';
 
+// Firebase konfigurace (automatické připojení)
+const FB_CONFIG = {
+    apiKey:      'AIzaSyCVHqWBRA73byFuJwUaLmBSXGGbPn1k8II',
+    databaseURL: 'https://pavel-vrtal-rybari-registrace-default-rtdb.europe-west1.firebasedatabase.app',
+    projectId:   'pavel-vrtal-rybari-registrace'
+};
+
 const LS = {
     FISHERS:  'hlb_fishers',
     CHECKINS: 'hlb_checkins',
@@ -574,9 +581,10 @@ fishers  = lsLoad(LS.FISHERS);
 checkins = lsLoad(LS.CHECKINS);
 catches  = lsLoad(LS.CATCHES);
 
-const fbUrl = localStorage.getItem(LS.FB_URL);
-const fbKey = localStorage.getItem(LS.FB_KEY);
-if (fbUrl && fbKey) initFirebase(fbUrl, fbKey);
+// Automatické připojení Firebase
+const fbUrl = localStorage.getItem(LS.FB_URL) || FB_CONFIG.databaseURL;
+const fbKey = localStorage.getItem(LS.FB_KEY) || FB_CONFIG.apiKey;
+initFirebase(fbUrl, fbKey);
 
 updateSyncBar();
 initYearSelectors();
