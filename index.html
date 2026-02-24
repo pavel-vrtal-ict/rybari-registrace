@@ -6,6 +6,9 @@
     <title>Rybářské závody</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <header>
@@ -13,8 +16,15 @@
             <h1>🐟 Rybářské závody</h1>
             <p class="subtitle">Registrace · Check-in · Úlovky</p>
         </div>
-        <button class="header-settings-btn" id="btn-open-settings" title="Nastavení URL pro QR kódy">⚙️</button>
+        <button class="header-settings-btn" id="btn-open-settings" title="Nastavení">⚙️</button>
     </header>
+
+    <!-- Sync status bar -->
+    <div id="sync-bar" class="sync-bar sync-local">
+        <span id="sync-icon">💾</span>
+        <span id="sync-text">Lokální režim – data nejsou sdílena</span>
+        <button class="sync-setup-btn" id="btn-sync-setup">Nastavit sdílení</button>
+    </div>
 
     <nav id="main-nav">
         <button class="nav-btn active" data-view="competitions">
@@ -61,7 +71,8 @@
             </div>
             <div id="no-competition-for-reg" class="empty-state">
                 <span class="empty-icon">📋</span>
-                <p>Nejdříve vytvořte závod.</p>
+                <p>Zatím nejsou žádné otevřené závody.</p>
+                <p class="hint">Závod musí být nejprve vytvořen organizátorem.</p>
             </div>
             <form id="registration-form" class="form-card" style="display:none;">
                 <div class="form-group">
@@ -171,25 +182,24 @@
                 <div class="form-group">
                     <label for="comp-ponds">Rybníky (stanoviště)</label>
                     <input type="text" id="comp-ponds" placeholder="Velký rybník, Malý rybník, Jezero">
-                    <small class="form-hint">Oddělte čárkou. Každý rybník dostane vlastní QR kód pro check-in.</small>
+                    <small class="form-hint">Oddělte čárkou.</small>
                 </div>
                 <div class="form-group">
                     <label for="comp-catch-limit">Počet úlovků v ceně (pak příplatek)</label>
                     <input type="number" id="comp-catch-limit" min="1" value="2">
-                    <small class="form-hint">Po překročení tohoto počtu musí závodník doplatit.</small>
                 </div>
                 <div class="form-group">
                     <label for="comp-desc">Popis / pravidla</label>
                     <textarea id="comp-desc" rows="3" placeholder="Pravidla závodu, povolené nástrahy..."></textarea>
                 </div>
-                <button type="submit" class="btn btn-primary btn-full" id="btn-save-competition">Uložit závod</button>
+                <button type="submit" class="btn btn-primary btn-full">Uložit závod</button>
             </form>
         </div>
     </div>
 
     <!-- MODAL: Detail závodu -->
     <div id="modal-detail" class="modal-overlay">
-        <div class="modal modal-wide">
+        <div class="modal">
             <div class="modal-header">
                 <h3>Detail závodu</h3>
                 <button class="modal-close" id="modal-close-detail">&times;</button>
@@ -221,27 +231,47 @@
         </div>
     </div>
 
-    <!-- MODAL: Nastavení URL pro QR kódy -->
+    <!-- MODAL: Nastavení -->
     <div id="modal-settings" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3>⚙️ Nastavení URL pro QR kódy</h3>
+                <h3>⚙️ Nastavení</h3>
                 <button class="modal-close" id="modal-close-settings">&times;</button>
             </div>
-            <div style="margin-bottom:1rem;padding:0.85rem;background:var(--warning-light);border-radius:var(--radius-sm);border:1px solid var(--warning);font-size:0.9rem;">
-                <strong>Proč je to potřeba?</strong><br>
-                QR kód musí odkazovat na veřejnou webovou adresu, aby ho závodník mohl naskenovat mobilem.
-                Lokální cesta <code>file://</code> na jiném zařízení nefunguje.
+
+            <div class="settings-section">
+                <h4>🔥 Sdílení dat přes Firebase</h4>
+                <p class="settings-desc">
+                    Bez Firebase jsou data uložena pouze v tomto prohlížeči a závodníci na jiných zařízeních je neuvidí.
+                    Firebase umožňuje sdílení dat v reálném čase přes všechna zařízení.
+                </p>
+                <div id="firebase-status" class="firebase-status-box"></div>
+                <div class="form-group">
+                    <label for="settings-firebase-url">Firebase Realtime Database URL</label>
+                    <input type="url" id="settings-firebase-url"
+                        placeholder="https://vas-projekt-default-rtdb.europe-west1.firebasedatabase.app">
+                    <small class="form-hint">Najdete v Firebase Console → Realtime Database → Data → URL</small>
+                </div>
+                <div class="form-group">
+                    <label for="settings-firebase-key">Firebase Web API Key</label>
+                    <input type="text" id="settings-firebase-key" placeholder="AIzaSy...">
+                    <small class="form-hint">Firebase Console → Project settings → Web API key</small>
+                </div>
+                <button class="btn btn-primary btn-full" id="btn-save-firebase">Připojit Firebase</button>
+                <button class="btn btn-secondary btn-full" id="btn-disconnect-firebase" style="margin-top:0.5rem;display:none;">Odpojit Firebase</button>
             </div>
-            <div class="form-group">
-                <label for="settings-base-url">Veřejná URL adresa aplikace</label>
-                <input type="url" id="settings-base-url" placeholder="https://vas-github.github.io/rybari-registrace/">
-                <small class="form-hint">
-                    Zadejte adresu po nasazení na GitHub Pages nebo Netlify.<br>
-                    Dokud nemáte veřejnou URL, použijte manuální check-in v záložce Check-in.
-                </small>
+
+            <hr style="margin:1.25rem 0;border-color:var(--border-light);">
+
+            <div class="settings-section">
+                <h4>📱 URL pro QR kódy</h4>
+                <p class="settings-desc">Automaticky: <code>https://pavel-vrtal-ict.github.io/rybari-registrace/</code></p>
+                <div class="form-group">
+                    <label for="settings-base-url">Vlastní URL (volitelné)</label>
+                    <input type="url" id="settings-base-url" placeholder="https://...">
+                </div>
+                <button class="btn btn-secondary btn-full" id="btn-save-settings">Uložit URL</button>
             </div>
-            <button class="btn btn-primary btn-full" id="btn-save-settings">Uložit</button>
         </div>
     </div>
 

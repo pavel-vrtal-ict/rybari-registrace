@@ -110,6 +110,41 @@ header {
     gap: 0.5rem;
 }
 
+/* HEADER SETTINGS BTN */
+header { position: relative; }
+.header-settings-btn {
+    position: absolute; top: 0.75rem; right: 0.75rem;
+    background: rgba(255,255,255,0.15); border: none; border-radius: 50%;
+    width: 36px; height: 36px; font-size: 1.1rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: background 0.2s;
+}
+.header-settings-btn:hover { background: rgba(255,255,255,0.3); }
+
+/* SYNC BAR */
+.sync-bar {
+    display: flex; align-items: center; justify-content: center;
+    gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.82rem; font-weight: 600;
+    flex-wrap: wrap;
+}
+.sync-local   { background: #fff3cd; color: #856404; }
+.sync-firebase { background: #e6f4ea; color: var(--primary); }
+
+.sync-setup-btn {
+    padding: 0.2rem 0.65rem; border-radius: 100px; border: 1px solid currentColor;
+    background: transparent; color: inherit; font-size: 0.78rem; font-weight: 700;
+    cursor: pointer;
+}
+.sync-setup-btn:hover { opacity: 0.75; }
+
+/* SETTINGS */
+.settings-section { margin-bottom: 1rem; }
+.settings-section h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.35rem; }
+.settings-desc { font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.5; }
+.settings-desc code { background: var(--surface-alt); padding: 0.1rem 0.3rem; border-radius: 4px; font-size: 0.8rem; word-break: break-all; }
+
+.fb-status-ok   { padding:0.65rem;border-radius:var(--radius-sm);background:#e6f4ea;color:var(--success);font-weight:600;font-size:0.85rem;margin-bottom:0.75rem; }
+.fb-status-warn { padding:0.65rem;border-radius:var(--radius-sm);background:#fff3cd;color:#856404;font-weight:600;font-size:0.85rem;margin-bottom:0.75rem; }
+
 /* NAV */
 nav {
     display: flex;
