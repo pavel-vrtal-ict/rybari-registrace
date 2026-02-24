@@ -125,16 +125,25 @@
         return new Date(ts).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
     }
 
+    const GITHUB_PAGES_URL = 'https://pavel-vrtal-ict.github.io/rybari-registrace';
+
     function getBaseUrl() {
         const saved = localStorage.getItem(KEYS.BASE_URL);
         if (saved && saved.startsWith('http')) {
             return saved.replace(/\/$/, '') + '/index.html';
+        }
+        if (isLocalFile()) {
+            return GITHUB_PAGES_URL + '/index.html';
         }
         return window.location.origin + window.location.pathname;
     }
 
     function isLocalFile() {
         return window.location.protocol === 'file:';
+    }
+
+    function hasValidBaseUrl() {
+        return !isLocalFile() || true; // vždy OK, fallback na GitHub Pages
     }
 
     function parsePonds(str) {
@@ -999,7 +1008,6 @@
 
     $('#btn-open-settings').addEventListener('click', openSettings);
     $('#modal-close-settings').addEventListener('click', () => closeModal(modalSettings));
-    $('#btn-banner-settings').addEventListener('click', openSettings);
     modalSettings.addEventListener('click', (e) => { if (e.target === modalSettings) closeModal(modalSettings); });
 
     $('#btn-save-settings').addEventListener('click', () => {
@@ -1015,45 +1023,11 @@
     });
 
     function updateLocalBanner() {
-        const banner = $('#local-banner');
-        const savedUrl = localStorage.getItem(KEYS.BASE_URL);
-        if (isLocalFile() && !savedUrl) {
-            banner.style.display = 'flex';
-        } else {
-            banner.style.display = 'none';
-        }
+        // banner odstraněn – QR kódy vždy ukazují na GitHub Pages
     }
 
-    // Přepsat showQrCode aby varoval při lokálním provozu bez nastavené URL
-    const _origShowQrCode = showQrCode;
-
     function showQrCodeSafe(title, url, subtitle) {
-        const savedUrl = localStorage.getItem(KEYS.BASE_URL);
-        if (isLocalFile() && !savedUrl) {
-            const body = $('#qr-body');
-            $('#modal-qr-title').textContent = title;
-            body.innerHTML = `
-                <div style="text-align:center;padding:1rem;">
-                    <div style="font-size:3rem;margin-bottom:0.75rem;">⚠️</div>
-                    <p style="font-weight:700;margin-bottom:0.5rem;">QR kód nelze vygenerovat</p>
-                    <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1rem;">
-                        Aplikace běží lokálně. Závodník by naskenoval cestu k vašemu počítači, která na jiném zařízení nefunguje.
-                    </p>
-                    <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1.25rem;">
-                        <strong>Řešení:</strong> Nasaďte aplikaci na GitHub Pages nebo Netlify a zadejte veřejnou URL v nastavení (⚙️).
-                    </p>
-                    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem;">
-                        Mezitím použijte <strong>manuální check-in</strong> v záložce Check-in.
-                    </p>
-                    <button class="btn btn-primary btn-full" onclick="document.getElementById('modal-qr').classList.remove('open');document.body.style.overflow='';document.getElementById('btn-open-settings').click();">
-                        ⚙️ Zadat veřejnou URL
-                    </button>
-                </div>
-            `;
-            openModal(modalQr);
-            return;
-        }
-        _origShowQrCode(title, url, subtitle);
+        showQrCode(title, url, subtitle);
     }
 
     // Přepsat window._showPondQRs a _showCatchQr aby použily safe verzi
@@ -1064,12 +1038,6 @@
 
         if (comp.ponds.length === 0) {
             showToast('Závod nemá definované rybníky', 'warning');
-            return;
-        }
-
-        const savedUrl = localStorage.getItem(KEYS.BASE_URL);
-        if (isLocalFile() && !savedUrl) {
-            showQrCodeSafe('QR check-in', '', '');
             return;
         }
 
@@ -1108,12 +1076,6 @@
     window._showCatchQr = function (compId) {
         const sel = $(`#catch-participant-${compId}`);
         if (!sel || !sel.value) { showToast('Vyberte závodníka', 'warning'); return; }
-
-        const savedUrl = localStorage.getItem(KEYS.BASE_URL);
-        if (isLocalFile() && !savedUrl) {
-            showQrCodeSafe('QR úlovek', '', '');
-            return;
-        }
 
         const comp = competitions.find(c => c.id === compId);
         const p = participants.find(x => x.id === sel.value);
