@@ -73,7 +73,13 @@
         const pond = params.get('pond');
         const pid = params.get('pid');
 
-        if (action === 'checkin' && compId && pond) {
+        if (action === 'register' && compId) {
+            switchView('registration');
+            setTimeout(() => {
+                const sel = $('#reg-competition');
+                if (sel) { sel.value = compId; }
+            }, 300);
+        } else if (action === 'checkin' && compId && pond) {
             switchView('checkin');
             setTimeout(() => performCheckinFromUrl(compId, pond), 300);
         } else if (action === 'catch' && compId && pid) {
@@ -354,7 +360,8 @@
 
             <div class="detail-actions">
                 <button class="btn btn-secondary" onclick="window._editCompetition('${comp.id}')">✏️ Upravit</button>
-                <button class="btn btn-primary" onclick="window._showPondQRs('${comp.id}')">📱 QR check-in</button>
+                <button class="btn btn-primary" onclick="window._showRegQr('${comp.id}')">📱 QR registrace</button>
+                <button class="btn btn-primary" onclick="window._showPondQRs('${comp.id}')">📍 QR check-in</button>
                 <button class="btn btn-danger" onclick="window._deleteCompetition('${comp.id}')">🗑️ Smazat</button>
             </div>
         `;
@@ -392,6 +399,55 @@
         closeModal(modalDetail);
         renderCompetitions();
         showToast('Závod smazán');
+    };
+
+    window._showRegQr = function (id) {
+        const comp = competitions.find(c => c.id === id);
+        if (!comp) return;
+        closeModal(modalDetail);
+
+        const status = getCompetitionStatus(comp);
+        if (status.class === 'badge-full') {
+            showToast('Závod je plný – registrace uzavřena', 'warning');
+            return;
+        }
+        if (status.class === 'badge-past') {
+            showToast('Závod již proběhl', 'warning');
+            return;
+        }
+
+        const url = getBaseUrl() + '?action=register&comp=' + id;
+        const regCount = participants.filter(p => p.competitionId === id).length;
+
+        $('#modal-qr-title').textContent = 'QR – Registrace na závod';
+        const body = $('#qr-body');
+        body.innerHTML = '';
+
+        const info = document.createElement('div');
+        info.style.cssText = 'text-align:center;margin-bottom:1rem;';
+        info.innerHTML = `
+            <p style="font-weight:700;font-size:1.05rem;">${escHtml(comp.name)}</p>
+            <p style="color:var(--text-secondary);font-size:0.85rem;">
+                📅 ${formatDate(comp.date)} · 👥 ${regCount}/${comp.maxParticipants} míst
+            </p>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-top:0.4rem;">
+                Závodník naskenuje a vyplní registrační formulář.
+            </p>
+        `;
+        body.appendChild(info);
+
+        const qrDiv = document.createElement('div');
+        qrDiv.id = 'qr-reg-canvas';
+        qrDiv.style.cssText = 'display:flex;justify-content:center;margin:0 auto;';
+        body.appendChild(qrDiv);
+
+        const urlDiv = document.createElement('div');
+        urlDiv.className = 'qr-url';
+        urlDiv.textContent = url;
+        body.appendChild(urlDiv);
+
+        openModal(modalQr);
+        setTimeout(() => makeQr(qrDiv, url, 280), 50);
     };
 
     // _showPondQRs je definována níže (s kontrolou lokálního provozu)
