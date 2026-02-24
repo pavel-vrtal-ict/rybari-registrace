@@ -327,6 +327,35 @@ main {
 .badge-full { background: #fdeaea; color: var(--danger); }
 .badge-past { background: #f0f0f0; color: #777; }
 
+.card-qr-row {
+    margin-top: 0.65rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid var(--border-light);
+}
+
+.btn-qr-reg {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1rem;
+    border: 1.5px dashed var(--primary);
+    border-radius: var(--radius-sm);
+    background: #f0faf4;
+    color: var(--primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-qr-reg:hover {
+    background: var(--primary);
+    color: #fff;
+    border-style: solid;
+}
+
 /* EMPTY STATE */
 .empty-state {
     text-align: center;

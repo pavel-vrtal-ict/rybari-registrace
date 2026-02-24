@@ -274,6 +274,7 @@
             const status = getCompetitionStatus(comp);
             const regCount = participants.filter(p => p.competitionId === comp.id).length;
             const totalCatches = catches.filter(c => c.competitionId === comp.id).length;
+            const canRegister = status.class === 'badge-open';
             return `
                 <div class="card" data-id="${comp.id}">
                     <div class="card-title">${escHtml(comp.name)}</div>
@@ -294,12 +295,28 @@
                             ${totalCatches ? ` · 🐟 ${totalCatches}` : ''}
                         </span>
                     </div>
+                    ${canRegister ? `
+                    <div class="card-qr-row">
+                        <button class="btn btn-qr-reg" data-qr-id="${comp.id}">
+                            📱 QR pro registraci
+                        </button>
+                    </div>` : ''}
                 </div>
             `;
         }).join('');
 
         list.querySelectorAll('.card').forEach(card => {
-            card.addEventListener('click', () => openCompetitionDetail(card.dataset.id));
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.btn-qr-reg')) return;
+                openCompetitionDetail(card.dataset.id);
+            });
+        });
+
+        list.querySelectorAll('.btn-qr-reg').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                window._showRegQr(btn.dataset.qrId);
+            });
         });
     }
 
