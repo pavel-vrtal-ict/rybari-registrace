@@ -3,231 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rybářské závody</title>
+    <title>Hlybuček – Evidence rybolovu</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
+
     <header>
         <div class="header-content">
-            <h1>🐟 Rybářské závody</h1>
-            <p class="subtitle">Registrace · Check-in · Úlovky</p>
+            <h1>🎣 Hlybuček</h1>
+            <p class="subtitle">Evidence rybolovu · Kapr 45–60 cm</p>
         </div>
         <button class="header-settings-btn" id="btn-open-settings" title="Nastavení">⚙️</button>
     </header>
 
-    <!-- Sync status bar -->
     <div id="sync-bar" class="sync-bar sync-local">
         <span id="sync-icon">💾</span>
-        <span id="sync-text">Lokální režim – data nejsou sdílena</span>
-        <button class="sync-setup-btn" id="btn-sync-setup">Nastavit sdílení</button>
+        <span id="sync-text">Lokální režim</span>
+        <button class="sync-setup-btn" id="btn-sync-setup">Nastavit Firebase</button>
     </div>
 
     <nav id="main-nav">
-        <button class="nav-btn active" data-view="competitions">
-            <span class="nav-icon">🏆</span>
-            <span class="nav-label">Závody</span>
+        <button class="nav-btn active" data-view="rybari">
+            <span class="nav-icon">👤</span>
+            <span class="nav-label">Rybáři</span>
         </button>
-        <button class="nav-btn" data-view="registration">
-            <span class="nav-icon">📝</span>
-            <span class="nav-label">Registrace</span>
+        <button class="nav-btn" data-view="dochazka">
+            <span class="nav-icon">📅</span>
+            <span class="nav-label">Docházka</span>
         </button>
-        <button class="nav-btn" data-view="checkin">
-            <span class="nav-icon">📍</span>
-            <span class="nav-label">Check-in</span>
-        </button>
-        <button class="nav-btn" data-view="catches">
+        <button class="nav-btn" data-view="ulovky">
             <span class="nav-icon">🐟</span>
             <span class="nav-label">Úlovky</span>
         </button>
-        <button class="nav-btn" data-view="results">
+        <button class="nav-btn" data-view="statistiky">
             <span class="nav-icon">📊</span>
-            <span class="nav-label">Přehled</span>
+            <span class="nav-label">Statistiky</span>
         </button>
     </nav>
 
     <main id="app">
-        <!-- ZÁVODY -->
-        <section id="view-competitions" class="view active">
+
+        <!-- RYBÁŘI -->
+        <section id="view-rybari" class="view active">
             <div class="section-header">
-                <h2>Závody</h2>
-                <button class="btn btn-primary" id="btn-new-competition">+ Nový závod</button>
+                <h2>Rybáři</h2>
+                <button class="btn btn-primary" id="btn-new-fisher">+ Přidat</button>
             </div>
-            <div id="competitions-list" class="card-list"></div>
-            <div id="no-competitions" class="empty-state">
-                <span class="empty-icon">🎣</span>
-                <p>Zatím nemáte žádné závody.</p>
-                <p class="hint">Klikněte na „+ Nový závod" pro vytvoření.</p>
+            <div id="fishers-list" class="card-list"></div>
+            <div id="no-fishers" class="empty-state">
+                <span class="empty-icon">👤</span>
+                <p>Zatím nejsou přidáni žádní rybáři.</p>
+                <p class="hint">Klikněte na „+ Přidat" pro registraci.</p>
             </div>
         </section>
 
-        <!-- REGISTRACE -->
-        <section id="view-registration" class="view">
+        <!-- DOCHÁZKA -->
+        <section id="view-dochazka" class="view">
             <div class="section-header">
-                <h2>Registrace závodníka</h2>
+                <h2>Dnešní docházka</h2>
+                <button class="btn btn-secondary btn-sm" id="btn-manual-checkin">+ Ruční záznam</button>
             </div>
-            <div id="no-competition-for-reg" class="empty-state">
-                <span class="empty-icon">📋</span>
-                <p>Zatím nejsou žádné otevřené závody.</p>
-                <p class="hint">Závod musí být nejprve vytvořen organizátorem.</p>
-            </div>
-            <form id="registration-form" class="form-card" style="display:none;">
-                <div class="form-group">
-                    <label for="reg-competition">Závod</label>
-                    <select id="reg-competition" required></select>
-                </div>
-                <div class="form-group">
-                    <label for="reg-name">Jméno a příjmení</label>
-                    <input type="text" id="reg-name" placeholder="Jan Novák" required>
-                </div>
-                <div class="form-group">
-                    <label for="reg-club">Rybářský spolek / oddíl</label>
-                    <input type="text" id="reg-club" placeholder="MO ČRS Třebíč">
-                </div>
-                <div class="form-group">
-                    <label for="reg-phone">Telefon</label>
-                    <input type="tel" id="reg-phone" placeholder="+420 123 456 789">
-                </div>
-                <div class="form-group">
-                    <label for="reg-email">E-mail</label>
-                    <input type="email" id="reg-email" placeholder="jan@email.cz">
-                </div>
-                <div class="form-group">
-                    <label for="reg-category">Kategorie</label>
-                    <select id="reg-category">
-                        <option value="dospeli">Dospělí</option>
-                        <option value="mladez">Mládež (do 18 let)</option>
-                        <option value="deti">Děti (do 12 let)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="reg-note">Poznámka</label>
-                    <textarea id="reg-note" rows="2" placeholder="Volitelná poznámka..."></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary btn-full">Zaregistrovat</button>
-            </form>
-        </section>
-
-        <!-- CHECK-IN -->
-        <section id="view-checkin" class="view">
-            <div class="section-header">
-                <h2>Check-in u rybníka</h2>
-            </div>
-            <div id="checkin-content"></div>
+            <div id="dochazka-content"></div>
         </section>
 
         <!-- ÚLOVKY -->
-        <section id="view-catches" class="view">
+        <section id="view-ulovky" class="view">
             <div class="section-header">
-                <h2>Nahlásit úlovek</h2>
+                <h2>Úlovky</h2>
             </div>
-            <div id="catches-content"></div>
+            <div id="ulovky-content"></div>
         </section>
 
-        <!-- PŘEHLED -->
-        <section id="view-results" class="view">
+        <!-- STATISTIKY -->
+        <section id="view-statistiky" class="view">
             <div class="section-header">
-                <h2>Přehled závodníků</h2>
+                <h2>Statistiky</h2>
+                <select id="stats-year" class="year-select"></select>
             </div>
-            <div id="results-controls" style="display:none;">
-                <div class="form-group">
-                    <label for="results-competition">Závod</label>
-                    <select id="results-competition"></select>
-                </div>
-                <div class="results-stats" id="results-stats"></div>
-            </div>
-            <div id="participants-list" class="participants-table-wrap"></div>
-            <div id="no-participants" class="empty-state">
-                <span class="empty-icon">👥</span>
-                <p>Zatím žádní registrovaní závodníci.</p>
-            </div>
-            <div id="results-actions" style="display:none;">
-                <button class="btn btn-secondary" id="btn-export-csv">📥 Export CSV</button>
-                <button class="btn btn-secondary" id="btn-print">🖨️ Tisk</button>
-            </div>
+            <div id="statistiky-content"></div>
         </section>
+
     </main>
 
-    <!-- MODAL: Nový závod -->
-    <div id="modal-competition" class="modal-overlay">
+    <!-- PŘÍCHOD (přes QR) – fullscreen overlay -->
+    <div id="checkin-overlay" class="checkin-overlay" style="display:none;">
+        <div class="checkin-card">
+            <div class="checkin-fish-icon">🎣</div>
+            <h2 id="co-fisher-name">Rybář</h2>
+            <p class="checkin-location">📍 Hlybuček</p>
+            <p class="checkin-time" id="co-time"></p>
+            <div class="checkin-status-msg" id="co-status"></div>
+
+            <div class="catch-quick-form" id="co-catch-form">
+                <h3>Přidat úlovek?</h3>
+                <div class="length-input-wrap">
+                    <input type="number" id="co-catch-length" min="10" max="120"
+                        placeholder="délka cm" class="length-input">
+                    <span class="length-unit">cm</span>
+                </div>
+                <div id="co-length-hint" class="length-hint"></div>
+                <button class="btn btn-primary btn-full" id="co-catch-btn">🐟 Zapsat úlovek</button>
+            </div>
+
+            <button class="btn btn-secondary btn-full" id="co-close-btn" style="margin-top:0.75rem;">
+                Zavřít
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL: Přidat rybáře -->
+    <div id="modal-fisher" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3 id="modal-competition-title">Nový závod</h3>
-                <button class="modal-close" id="modal-close-competition">&times;</button>
+                <h3 id="modal-fisher-title">Nový rybář</h3>
+                <button class="modal-close" id="modal-close-fisher">&times;</button>
             </div>
-            <form id="competition-form">
+            <form id="fisher-form">
                 <div class="form-group">
-                    <label for="comp-name">Název závodu</label>
-                    <input type="text" id="comp-name" placeholder="Pohár starosty 2026" required>
+                    <label for="fisher-name">Jméno a příjmení</label>
+                    <input type="text" id="fisher-name" placeholder="Jan Novák" required>
                 </div>
                 <div class="form-group">
-                    <label for="comp-date">Datum</label>
-                    <input type="date" id="comp-date" required>
+                    <label for="fisher-number">Číslo rybářského lístku</label>
+                    <input type="text" id="fisher-number" placeholder="12345">
                 </div>
                 <div class="form-group">
-                    <label for="comp-time">Čas zahájení</label>
-                    <input type="time" id="comp-time" value="07:00">
+                    <label for="fisher-phone">Telefon</label>
+                    <input type="tel" id="fisher-phone" placeholder="+420 123 456 789">
                 </div>
-                <div class="form-group">
-                    <label for="comp-location">Místo konání</label>
-                    <input type="text" id="comp-location" placeholder="Rybník Velký, Třebíč" required>
-                </div>
-                <div class="form-group">
-                    <label for="comp-max">Max. počet závodníků</label>
-                    <input type="number" id="comp-max" min="1" value="50">
-                </div>
-                <div class="form-group">
-                    <label for="comp-ponds">Rybníky (stanoviště)</label>
-                    <input type="text" id="comp-ponds" placeholder="Velký rybník, Malý rybník, Jezero">
-                    <small class="form-hint">Oddělte čárkou.</small>
-                </div>
-                <div class="form-group">
-                    <label for="comp-catch-limit">Počet úlovků v ceně (pak příplatek)</label>
-                    <input type="number" id="comp-catch-limit" min="1" value="2">
-                </div>
-                <div class="form-group">
-                    <label for="comp-desc">Popis / pravidla</label>
-                    <textarea id="comp-desc" rows="3" placeholder="Pravidla závodu, povolené nástrahy..."></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary btn-full">Uložit závod</button>
+                <button type="submit" class="btn btn-primary btn-full">Uložit</button>
             </form>
         </div>
     </div>
 
-    <!-- MODAL: Detail závodu -->
-    <div id="modal-detail" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Detail závodu</h3>
-                <button class="modal-close" id="modal-close-detail">&times;</button>
-            </div>
-            <div id="competition-detail-body"></div>
-        </div>
-    </div>
-
-    <!-- MODAL: QR kód -->
+    <!-- MODAL: QR kód rybáře -->
     <div id="modal-qr" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3 id="modal-qr-title">QR kód</h3>
+                <h3 id="modal-qr-title">Osobní QR kód</h3>
                 <button class="modal-close" id="modal-close-qr">&times;</button>
             </div>
             <div id="qr-body" class="qr-body"></div>
         </div>
     </div>
 
-    <!-- MODAL: Notifikace příplatek -->
-    <div id="modal-payment" class="modal-overlay">
-        <div class="modal modal-alert">
-            <div class="payment-alert">
-                <span class="payment-icon">💰</span>
-                <h3>Příplatek za úlovek!</h3>
-                <p id="payment-message"></p>
-                <button class="btn btn-primary btn-full" id="btn-payment-ok">Rozumím</button>
+    <!-- MODAL: Ruční záznam docházky -->
+    <div id="modal-manual" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Ruční záznam příchodu</h3>
+                <button class="modal-close" id="modal-close-manual">&times;</button>
             </div>
+            <div class="form-group">
+                <label for="manual-fisher">Rybář</label>
+                <select id="manual-fisher"></select>
+            </div>
+            <div class="form-group">
+                <label for="manual-date">Datum</label>
+                <input type="date" id="manual-date">
+            </div>
+            <button class="btn btn-primary btn-full" id="btn-save-manual">Zapsat příchod</button>
         </div>
     </div>
 
@@ -238,39 +176,20 @@
                 <h3>⚙️ Nastavení</h3>
                 <button class="modal-close" id="modal-close-settings">&times;</button>
             </div>
-
             <div class="settings-section">
-                <h4>🔥 Sdílení dat přes Firebase</h4>
-                <p class="settings-desc">
-                    Bez Firebase jsou data uložena pouze v tomto prohlížeči a závodníci na jiných zařízeních je neuvidí.
-                    Firebase umožňuje sdílení dat v reálném čase přes všechna zařízení.
-                </p>
+                <h4>🔥 Firebase – sdílení dat</h4>
+                <p class="settings-desc">Bez Firebase jsou data jen v tomto prohlížeči. Firebase = sdílení přes všechna zařízení v reálném čase.</p>
                 <div id="firebase-status" class="firebase-status-box"></div>
                 <div class="form-group">
-                    <label for="settings-firebase-url">Firebase Realtime Database URL</label>
-                    <input type="url" id="settings-firebase-url"
-                        placeholder="https://vas-projekt-default-rtdb.europe-west1.firebasedatabase.app">
-                    <small class="form-hint">Najdete v Firebase Console → Realtime Database → Data → URL</small>
+                    <label for="settings-firebase-url">Database URL</label>
+                    <input type="url" id="settings-firebase-url" placeholder="https://xxx-default-rtdb.europe-west1.firebasedatabase.app">
                 </div>
                 <div class="form-group">
-                    <label for="settings-firebase-key">Firebase Web API Key</label>
+                    <label for="settings-firebase-key">Web API Key</label>
                     <input type="text" id="settings-firebase-key" placeholder="AIzaSy...">
-                    <small class="form-hint">Firebase Console → Project settings → Web API key</small>
                 </div>
-                <button class="btn btn-primary btn-full" id="btn-save-firebase">Připojit Firebase</button>
+                <button class="btn btn-primary btn-full" id="btn-save-firebase">Připojit</button>
                 <button class="btn btn-secondary btn-full" id="btn-disconnect-firebase" style="margin-top:0.5rem;display:none;">Odpojit Firebase</button>
-            </div>
-
-            <hr style="margin:1.25rem 0;border-color:var(--border-light);">
-
-            <div class="settings-section">
-                <h4>📱 URL pro QR kódy</h4>
-                <p class="settings-desc">Automaticky: <code>https://pavel-vrtal-ict.github.io/rybari-registrace/</code></p>
-                <div class="form-group">
-                    <label for="settings-base-url">Vlastní URL (volitelné)</label>
-                    <input type="url" id="settings-base-url" placeholder="https://...">
-                </div>
-                <button class="btn btn-secondary btn-full" id="btn-save-settings">Uložit URL</button>
             </div>
         </div>
     </div>
