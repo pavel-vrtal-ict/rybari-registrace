@@ -1,46 +1,50 @@
 (function () {
     'use strict';
 
-    // ── Storage helpers ──
-    const STORAGE_KEYS = {
+    // ── Storage ──
+    const KEYS = {
         COMPETITIONS: 'ryb_competitions',
-        PARTICIPANTS: 'ryb_participants'
+        PARTICIPANTS: 'ryb_participants',
+        CHECKINS: 'ryb_checkins',
+        CATCHES: 'ryb_catches',
+        BASE_URL: 'ryb_base_url'
     };
 
     function load(key) {
-        try {
-            return JSON.parse(localStorage.getItem(key)) || [];
-        } catch {
-            return [];
-        }
+        try { return JSON.parse(localStorage.getItem(key)) || []; }
+        catch { return []; }
     }
 
     function save(key, data) {
         localStorage.setItem(key, JSON.stringify(data));
     }
 
-    let competitions = load(STORAGE_KEYS.COMPETITIONS);
-    let participants = load(STORAGE_KEYS.PARTICIPANTS);
+    let competitions = load(KEYS.COMPETITIONS);
+    let participants = load(KEYS.PARTICIPANTS);
+    let checkins = load(KEYS.CHECKINS);
+    let catches = load(KEYS.CATCHES);
 
-    function generateId() {
+    function genId() {
         return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     }
 
-    // ── DOM refs ──
-    const $ = (sel) => document.querySelector(sel);
-    const $$ = (sel) => document.querySelectorAll(sel);
+    // ── DOM ──
+    const $ = (s) => document.querySelector(s);
+    const $$ = (s) => document.querySelectorAll(s);
 
     const views = {
         competitions: $('#view-competitions'),
         registration: $('#view-registration'),
+        checkin: $('#view-checkin'),
+        catches: $('#view-catches'),
         results: $('#view-results')
     };
 
     const navBtns = $$('.nav-btn');
     const modalCompetition = $('#modal-competition');
     const modalDetail = $('#modal-detail');
-    const competitionForm = $('#competition-form');
-    const registrationForm = $('#registration-form');
+    const modalQr = $('#modal-qr');
+    const modalPayment = $('#modal-payment');
 
     // ── Navigation ──
     let currentView = 'competitions';
@@ -49,10 +53,11 @@
         currentView = name;
         Object.values(views).forEach(v => v.classList.remove('active'));
         views[name].classList.add('active');
-        navBtns.forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.view === name);
-        });
+        navBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.view === name));
+
         if (name === 'registration') renderRegistrationView();
+        if (name === 'checkin') renderCheckinView();
+        if (name === 'catches') renderCatchesView();
         if (name === 'results') renderResultsView();
     }
 
@@ -60,95 +65,180 @@
         btn.addEventListener('click', () => switchView(btn.dataset.view));
     });
 
+    // Handle deep-link from QR codes
+    function handleUrlAction() {
+        const params = new URLSearchParams(window.location.search);
+        const action = params.get('action');
+        const compId = params.get('comp');
+        const pond = params.get('pond');
+        const pid = params.get('pid');
+
+        if (action === 'checkin' && compId && pond) {
+            switchView('checkin');
+            setTimeout(() => performCheckinFromUrl(compId, pond), 300);
+        } else if (action === 'catch' && compId && pid) {
+            switchView('catches');
+            setTimeout(() => performCatchFromUrl(compId, pid), 300);
+        }
+    }
+
     // ── Toast ──
     let toastTimer;
-    function showToast(message) {
+    function showToast(message, type) {
         const toast = $('#toast');
         toast.textContent = message;
-        toast.classList.add('show');
+        toast.className = 'toast show' + (type ? ' toast-' + type : '');
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+        toastTimer = setTimeout(() => { toast.className = 'toast'; }, 3000);
     }
 
     // ── Modal helpers ──
-    function openModal(modal) {
-        modal.classList.add('open');
-        document.body.style.overflow = 'hidden';
-    }
+    function openModal(m) { m.classList.add('open'); document.body.style.overflow = 'hidden'; }
+    function closeModal(m) { m.classList.remove('open'); document.body.style.overflow = ''; }
 
-    function closeModal(modal) {
-        modal.classList.remove('open');
-        document.body.style.overflow = '';
-    }
-
-    modalCompetition.addEventListener('click', (e) => {
-        if (e.target === modalCompetition) closeModal(modalCompetition);
-    });
-
-    modalDetail.addEventListener('click', (e) => {
-        if (e.target === modalDetail) closeModal(modalDetail);
+    [modalCompetition, modalDetail, modalQr, modalPayment].forEach(m => {
+        m.addEventListener('click', (e) => { if (e.target === m) closeModal(m); });
     });
 
     $('#modal-close-competition').addEventListener('click', () => closeModal(modalCompetition));
     $('#modal-close-detail').addEventListener('click', () => closeModal(modalDetail));
+    $('#modal-close-qr').addEventListener('click', () => closeModal(modalQr));
+    $('#btn-payment-ok').addEventListener('click', () => closeModal(modalPayment));
 
-    // ── Competitions ──
-    let editingCompetitionId = null;
+    // ── Helpers ──
+    function escHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
 
-    $('#btn-new-competition').addEventListener('click', () => {
-        editingCompetitionId = null;
-        $('#modal-competition-title').textContent = 'Nový závod';
-        competitionForm.reset();
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 7);
-        $('#comp-date').value = tomorrow.toISOString().split('T')[0];
-        openModal(modalCompetition);
-    });
+    function slugify(str) {
+        return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
 
-    competitionForm.addEventListener('submit', (e) => {
-        e.preventDefault();
+    function formatDate(ds) {
+        return new Date(ds).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
 
-        const data = {
-            id: editingCompetitionId || generateId(),
-            name: $('#comp-name').value.trim(),
-            date: $('#comp-date').value,
-            time: $('#comp-time').value,
-            location: $('#comp-location').value.trim(),
-            maxParticipants: parseInt($('#comp-max').value) || 50,
-            description: $('#comp-desc').value.trim(),
-            createdAt: editingCompetitionId
-                ? competitions.find(c => c.id === editingCompetitionId)?.createdAt || new Date().toISOString()
-                : new Date().toISOString()
-        };
+    function formatTime(ts) {
+        return new Date(ts).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+    }
 
-        if (editingCompetitionId) {
-            const idx = competitions.findIndex(c => c.id === editingCompetitionId);
-            if (idx !== -1) competitions[idx] = data;
-        } else {
-            competitions.push(data);
+    function getBaseUrl() {
+        const saved = localStorage.getItem(KEYS.BASE_URL);
+        if (saved && saved.startsWith('http')) {
+            return saved.replace(/\/$/, '') + '/index.html';
         }
+        return window.location.origin + window.location.pathname;
+    }
 
-        save(STORAGE_KEYS.COMPETITIONS, competitions);
-        closeModal(modalCompetition);
-        renderCompetitions();
-        showToast(editingCompetitionId ? 'Závod upraven' : 'Závod vytvořen');
-        editingCompetitionId = null;
-    });
+    function isLocalFile() {
+        return window.location.protocol === 'file:';
+    }
+
+    function parsePonds(str) {
+        if (!str) return [];
+        return str.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    function getCategoryLabel(cat) {
+        return { dospeli: 'Dospělí', mladez: 'Mládež', deti: 'Děti' }[cat] || cat;
+    }
 
     function getCompetitionStatus(comp) {
         const now = new Date();
         const compDate = new Date(comp.date + 'T' + (comp.time || '23:59'));
         const regCount = participants.filter(p => p.competitionId === comp.id).length;
-
         if (compDate < now) return { label: 'Proběhl', class: 'badge-past' };
         if (regCount >= comp.maxParticipants) return { label: 'Plný', class: 'badge-full' };
         return { label: 'Otevřený', class: 'badge-open' };
     }
 
-    function formatDate(dateStr) {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' });
+    function getParticipantCatchCount(compId, participantId) {
+        return catches.filter(c => c.competitionId === compId && c.participantId === participantId).length;
     }
+
+    // ── QR Generation ──
+    function makeQr(container, url, size) {
+        if (typeof QRCode === 'undefined') return;
+        new QRCode(container, {
+            text: url,
+            width: size || 280,
+            height: size || 280,
+            colorDark: '#1a2e1f',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    }
+
+    function showQrCode(title, url, subtitle) {
+        $('#modal-qr-title').textContent = title;
+        const body = $('#qr-body');
+        body.innerHTML = '<div id="qr-canvas"></div>';
+
+        makeQr($('#qr-canvas'), url, 280);
+
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'qr-label';
+        labelDiv.textContent = subtitle || '';
+        body.appendChild(labelDiv);
+
+        const urlDiv = document.createElement('div');
+        urlDiv.className = 'qr-url';
+        urlDiv.textContent = url;
+        body.appendChild(urlDiv);
+
+        openModal(modalQr);
+    }
+
+    // ══════════════════════════════════════
+    // ── COMPETITIONS ──
+    // ══════════════════════════════════════
+
+    let editingCompId = null;
+
+    $('#btn-new-competition').addEventListener('click', () => {
+        editingCompId = null;
+        $('#modal-competition-title').textContent = 'Nový závod';
+        $('#competition-form').reset();
+        const d = new Date(); d.setDate(d.getDate() + 7);
+        $('#comp-date').value = d.toISOString().split('T')[0];
+        $('#comp-catch-limit').value = 2;
+        openModal(modalCompetition);
+    });
+
+    $('#competition-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        const data = {
+            id: editingCompId || genId(),
+            name: $('#comp-name').value.trim(),
+            date: $('#comp-date').value,
+            time: $('#comp-time').value,
+            location: $('#comp-location').value.trim(),
+            maxParticipants: parseInt($('#comp-max').value) || 50,
+            ponds: parsePonds($('#comp-ponds').value),
+            catchLimit: parseInt($('#comp-catch-limit').value) || 2,
+            description: $('#comp-desc').value.trim(),
+            createdAt: editingCompId
+                ? competitions.find(c => c.id === editingCompId)?.createdAt || new Date().toISOString()
+                : new Date().toISOString()
+        };
+
+        if (editingCompId) {
+            const idx = competitions.findIndex(c => c.id === editingCompId);
+            if (idx !== -1) competitions[idx] = data;
+        } else {
+            competitions.push(data);
+        }
+
+        save(KEYS.COMPETITIONS, competitions);
+        closeModal(modalCompetition);
+        renderCompetitions();
+        showToast(editingCompId ? 'Závod upraven' : 'Závod vytvořen');
+        editingCompId = null;
+    });
 
     function renderCompetitions() {
         const list = $('#competitions-list');
@@ -168,6 +258,7 @@
         list.innerHTML = sorted.map(comp => {
             const status = getCompetitionStatus(comp);
             const regCount = participants.filter(p => p.competitionId === comp.id).length;
+            const totalCatches = catches.filter(c => c.competitionId === comp.id).length;
             return `
                 <div class="card" data-id="${comp.id}">
                     <div class="card-title">${escHtml(comp.name)}</div>
@@ -176,10 +267,16 @@
                         <span>⏰ ${comp.time || '—'}</span>
                         <span>📍 ${escHtml(comp.location)}</span>
                     </div>
+                    ${comp.ponds.length ? `
+                        <div class="pond-tags">
+                            ${comp.ponds.map(p => `<span class="pond-tag">🏞️ ${escHtml(p)}</span>`).join('')}
+                        </div>
+                    ` : ''}
                     <div class="card-footer">
                         <span class="badge ${status.class}">${status.label}</span>
                         <span style="font-size:0.85rem;color:var(--text-secondary)">
-                            👥 ${regCount} / ${comp.maxParticipants}
+                            👥 ${regCount}/${comp.maxParticipants}
+                            ${totalCatches ? ` · 🐟 ${totalCatches}` : ''}
                         </span>
                     </div>
                 </div>
@@ -197,6 +294,7 @@
 
         const regCount = participants.filter(p => p.competitionId === id).length;
         const status = getCompetitionStatus(comp);
+        const totalCatches = catches.filter(c => c.competitionId === id).length;
 
         const body = $('#competition-detail-body');
         body.innerHTML = `
@@ -217,20 +315,37 @@
                 <span class="detail-value">${escHtml(comp.location)}</span>
             </div>
             <div class="detail-row">
-                <span class="detail-label">Registrace</span>
+                <span class="detail-label">Závodníci</span>
                 <span class="detail-value">${regCount} / ${comp.maxParticipants}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Úlovky celkem</span>
+                <span class="detail-value">${totalCatches}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Limit v ceně</span>
+                <span class="detail-value">${comp.catchLimit} úlovků (pak příplatek)</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Stav</span>
                 <span class="detail-value"><span class="badge ${status.class}">${status.label}</span></span>
             </div>
+            ${comp.ponds.length ? `
+            <div class="detail-row">
+                <span class="detail-label">Rybníky</span>
+                <span class="detail-value">
+                    <div class="pond-tags">${comp.ponds.map(p => `<span class="pond-tag">🏞️ ${escHtml(p)}</span>`).join('')}</div>
+                </span>
+            </div>` : ''}
             ${comp.description ? `
             <div class="detail-row">
                 <span class="detail-label">Popis</span>
                 <span class="detail-value">${escHtml(comp.description)}</span>
             </div>` : ''}
+
             <div class="detail-actions">
                 <button class="btn btn-secondary" onclick="window._editCompetition('${comp.id}')">✏️ Upravit</button>
+                <button class="btn btn-primary" onclick="window._showPondQRs('${comp.id}')">📱 QR check-in</button>
                 <button class="btn btn-danger" onclick="window._deleteCompetition('${comp.id}')">🗑️ Smazat</button>
             </div>
         `;
@@ -241,41 +356,45 @@
     window._editCompetition = function (id) {
         const comp = competitions.find(c => c.id === id);
         if (!comp) return;
-
         closeModal(modalDetail);
-        editingCompetitionId = id;
+        editingCompId = id;
         $('#modal-competition-title').textContent = 'Upravit závod';
         $('#comp-name').value = comp.name;
         $('#comp-date').value = comp.date;
         $('#comp-time').value = comp.time;
         $('#comp-location').value = comp.location;
         $('#comp-max').value = comp.maxParticipants;
+        $('#comp-ponds').value = comp.ponds.join(', ');
+        $('#comp-catch-limit').value = comp.catchLimit;
         $('#comp-desc').value = comp.description || '';
-
         setTimeout(() => openModal(modalCompetition), 200);
     };
 
     window._deleteCompetition = function (id) {
-        if (!confirm('Opravdu smazat tento závod a všechny jeho registrace?')) return;
-
+        if (!confirm('Smazat závod včetně všech registrací, check-inů a úlovků?')) return;
         competitions = competitions.filter(c => c.id !== id);
         participants = participants.filter(p => p.competitionId !== id);
-        save(STORAGE_KEYS.COMPETITIONS, competitions);
-        save(STORAGE_KEYS.PARTICIPANTS, participants);
+        checkins = checkins.filter(c => c.competitionId !== id);
+        catches = catches.filter(c => c.competitionId !== id);
+        save(KEYS.COMPETITIONS, competitions);
+        save(KEYS.PARTICIPANTS, participants);
+        save(KEYS.CHECKINS, checkins);
+        save(KEYS.CATCHES, catches);
         closeModal(modalDetail);
         renderCompetitions();
         showToast('Závod smazán');
     };
 
-    // ── Registration ──
-    function renderRegistrationView() {
-        const openComps = competitions.filter(comp => {
-            const status = getCompetitionStatus(comp);
-            return status.class === 'badge-open';
-        });
+    // _showPondQRs je definována níže (s kontrolou lokálního provozu)
 
+    // ══════════════════════════════════════
+    // ── REGISTRATION ──
+    // ══════════════════════════════════════
+
+    function renderRegistrationView() {
+        const openComps = competitions.filter(c => getCompetitionStatus(c).class === 'badge-open');
         const noComp = $('#no-competition-for-reg');
-        const form = registrationForm;
+        const form = $('#registration-form');
 
         if (openComps.length === 0) {
             noComp.style.display = 'block';
@@ -286,46 +405,37 @@
         noComp.style.display = 'none';
         form.style.display = 'block';
 
-        const select = $('#reg-competition');
-        const currentValue = select.value;
-        select.innerHTML = openComps.map(c =>
+        const sel = $('#reg-competition');
+        const cur = sel.value;
+        sel.innerHTML = openComps.map(c =>
             `<option value="${c.id}">${escHtml(c.name)} — ${formatDate(c.date)}</option>`
         ).join('');
-
-        if (openComps.find(c => c.id === currentValue)) {
-            select.value = currentValue;
-        }
+        if (openComps.find(c => c.id === cur)) sel.value = cur;
     }
 
-    registrationForm.addEventListener('submit', (e) => {
+    $('#registration-form').addEventListener('submit', (e) => {
         e.preventDefault();
-
         const compId = $('#reg-competition').value;
         const name = $('#reg-name').value.trim();
-
         if (!compId || !name) return;
 
         const comp = competitions.find(c => c.id === compId);
         if (!comp) return;
 
-        const regCount = participants.filter(p => p.competitionId === compId).length;
-        if (regCount >= comp.maxParticipants) {
-            showToast('Závod je již plný!');
+        if (participants.filter(p => p.competitionId === compId).length >= comp.maxParticipants) {
+            showToast('Závod je již plný!', 'danger');
             return;
         }
 
-        const duplicate = participants.find(p =>
-            p.competitionId === compId && p.name.toLowerCase() === name.toLowerCase()
-        );
-        if (duplicate) {
-            showToast('Závodník s tímto jménem je již registrován!');
+        if (participants.find(p => p.competitionId === compId && p.name.toLowerCase() === name.toLowerCase())) {
+            showToast('Závodník s tímto jménem je již registrován!', 'warning');
             return;
         }
 
         const participant = {
-            id: generateId(),
+            id: genId(),
             competitionId: compId,
-            name: name,
+            name,
             club: $('#reg-club').value.trim(),
             phone: $('#reg-phone').value.trim(),
             email: $('#reg-email').value.trim(),
@@ -335,56 +445,405 @@
         };
 
         participants.push(participant);
-        save(STORAGE_KEYS.PARTICIPANTS, participants);
-
-        registrationForm.reset();
+        save(KEYS.PARTICIPANTS, participants);
+        $('#registration-form').reset();
         $('#reg-competition').value = compId;
         renderCompetitions();
         showToast(`${participant.name} zaregistrován!`);
     });
 
-    // ── Results ──
+    // ══════════════════════════════════════
+    // ── CHECK-IN ──
+    // ══════════════════════════════════════
+
+    function renderCheckinView() {
+        const container = $('#checkin-content');
+        const compsWithPonds = competitions.filter(c => c.ponds && c.ponds.length > 0);
+
+        if (compsWithPonds.length === 0) {
+            container.innerHTML = `<div class="empty-state">
+                <span class="empty-icon">📍</span>
+                <p>Žádný závod nemá definované rybníky.</p>
+                <p class="hint">Přidejte rybníky v nastavení závodu.</p>
+            </div>`;
+            return;
+        }
+
+        container.innerHTML = compsWithPonds.map(comp => {
+            const compParticipants = participants.filter(p => p.competitionId === comp.id);
+
+            return `
+                <div class="action-card">
+                    <h3>🏆 ${escHtml(comp.name)}</h3>
+                    <div class="form-group">
+                        <label>Závodník</label>
+                        <select id="checkin-participant-${comp.id}">
+                            ${compParticipants.length === 0
+                                ? '<option value="">— žádní registrovaní —</option>'
+                                : compParticipants.map(p => `<option value="${p.id}">${escHtml(p.name)}</option>`).join('')
+                            }
+                        </select>
+                    </div>
+                    <div class="pond-checkin-list">
+                        ${comp.ponds.map(pond => {
+                            const checkedIn = checkins.filter(ci => ci.competitionId === comp.id && ci.pond === pond);
+                            return `
+                                <div class="pond-checkin-item">
+                                    <div>
+                                        <div class="pond-name">🏞️ ${escHtml(pond)}</div>
+                                        <div class="pond-count">${checkedIn.length} přihlášených</div>
+                                    </div>
+                                    <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+                                        <button class="btn btn-primary btn-sm"
+                                            onclick="window._doCheckin('${comp.id}','${escHtml(pond)}')">
+                                            ✓ Check-in
+                                        </button>
+                                        <button class="btn btn-secondary btn-sm"
+                                            onclick="window._showPondQr('${comp.id}','${escHtml(pond)}')">
+                                            QR
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    window._doCheckin = function (compId, pond) {
+        const sel = $(`#checkin-participant-${compId}`);
+        if (!sel || !sel.value) {
+            showToast('Vyberte závodníka', 'warning');
+            return;
+        }
+
+        const participantId = sel.value;
+        const p = participants.find(x => x.id === participantId);
+
+        const already = checkins.find(ci =>
+            ci.competitionId === compId && ci.participantId === participantId && ci.pond === pond
+        );
+        if (already) {
+            showToast(`${p?.name || 'Závodník'} je již přihlášen na tomto rybníku`, 'warning');
+            return;
+        }
+
+        checkins.push({
+            id: genId(),
+            competitionId: compId,
+            participantId,
+            pond,
+            time: new Date().toISOString()
+        });
+        save(KEYS.CHECKINS, checkins);
+        renderCheckinView();
+        showToast(`${p?.name || 'Závodník'} přihlášen – ${pond}`);
+    };
+
+    window._showPondQr = function (compId, pond) {
+        const comp = competitions.find(c => c.id === compId);
+        const url = getBaseUrl() + '?action=checkin&comp=' + compId + '&pond=' + encodeURIComponent(pond);
+        showQrCode('Check-in QR', url, `${comp?.name || ''} – ${pond}`);
+    };
+
+    function performCheckinFromUrl(compId, pond) {
+        const comp = competitions.find(c => c.id === compId);
+        if (!comp) { showToast('Závod nenalezen', 'danger'); return; }
+
+        const compParticipants = participants.filter(p => p.competitionId === compId);
+        if (compParticipants.length === 0) {
+            showToast('Žádní registrovaní závodníci', 'warning');
+            return;
+        }
+
+        const container = $('#checkin-content');
+        container.innerHTML = `
+            <div class="action-card">
+                <h3>📍 Check-in: ${escHtml(pond)}</h3>
+                <p style="color:var(--text-secondary);margin-bottom:1rem;">${escHtml(comp.name)}</p>
+                <div class="form-group">
+                    <label>Vyberte své jméno</label>
+                    <select id="url-checkin-participant">
+                        ${compParticipants.map(p => `<option value="${p.id}">${escHtml(p.name)}</option>`).join('')}
+                    </select>
+                </div>
+                <button class="btn btn-primary btn-full" id="url-checkin-btn">✓ Přihlásit se na ${escHtml(pond)}</button>
+            </div>
+        `;
+
+        $('#url-checkin-btn').addEventListener('click', () => {
+            const pid = $('#url-checkin-participant').value;
+            if (!pid) return;
+            window._doCheckin(compId, pond);
+            // Override: use the url-selected participant
+            const already = checkins.find(ci =>
+                ci.competitionId === compId && ci.participantId === pid && ci.pond === pond
+            );
+            if (!already) {
+                const p = participants.find(x => x.id === pid);
+                checkins.push({
+                    id: genId(),
+                    competitionId: compId,
+                    participantId: pid,
+                    pond,
+                    time: new Date().toISOString()
+                });
+                save(KEYS.CHECKINS, checkins);
+                showToast(`${p?.name || 'Závodník'} přihlášen – ${pond}`);
+            }
+            window.history.replaceState({}, '', getBaseUrl());
+            setTimeout(() => renderCheckinView(), 500);
+        });
+    }
+
+    // ══════════════════════════════════════
+    // ── CATCHES (ÚLOVKY) ──
+    // ══════════════════════════════════════
+
+    function renderCatchesView() {
+        const container = $('#catches-content');
+
+        if (competitions.length === 0) {
+            container.innerHTML = `<div class="empty-state">
+                <span class="empty-icon">🐟</span>
+                <p>Nejdříve vytvořte závod.</p>
+            </div>`;
+            return;
+        }
+
+        const compsWithParticipants = competitions.filter(c =>
+            participants.some(p => p.competitionId === c.id)
+        );
+
+        if (compsWithParticipants.length === 0) {
+            container.innerHTML = `<div class="empty-state">
+                <span class="empty-icon">🐟</span>
+                <p>Nejdříve zaregistrujte závodníky.</p>
+            </div>`;
+            return;
+        }
+
+        container.innerHTML = compsWithParticipants.map(comp => {
+            const compParticipants = participants.filter(p => p.competitionId === comp.id);
+
+            return `
+                <div class="action-card">
+                    <h3>🏆 ${escHtml(comp.name)}</h3>
+                    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.75rem;">
+                        V ceně: ${comp.catchLimit} úlovků · Poté příplatek
+                    </p>
+                    <div class="form-group">
+                        <label>Závodník</label>
+                        <select id="catch-participant-${comp.id}" onchange="window._showParticipantCatches('${comp.id}')">
+                            ${compParticipants.map(p => {
+                                const cnt = getParticipantCatchCount(comp.id, p.id);
+                                const overLimit = cnt >= comp.catchLimit;
+                                return `<option value="${p.id}">${escHtml(p.name)} (${cnt} úlovků${overLimit ? ' ⚠️' : ''})</option>`;
+                            }).join('')}
+                        </select>
+                    </div>
+                    <div id="catch-details-${comp.id}"></div>
+                    <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+                        <button class="btn btn-primary btn-full" onclick="window._addCatch('${comp.id}')">
+                            🐟 Nahlásit úlovek
+                        </button>
+                    </div>
+                    <div style="margin-top:0.75rem;">
+                        <button class="btn btn-secondary btn-sm" onclick="window._showCatchQr('${comp.id}')">
+                            📱 QR pro nahlášení úlovku
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        compsWithParticipants.forEach(comp => {
+            window._showParticipantCatches(comp.id);
+        });
+    }
+
+    window._showParticipantCatches = function (compId) {
+        const sel = $(`#catch-participant-${compId}`);
+        if (!sel) return;
+        const pid = sel.value;
+        const comp = competitions.find(c => c.id === compId);
+        const details = $(`#catch-details-${compId}`);
+        if (!details || !comp) return;
+
+        const pCatches = catches.filter(c => c.competitionId === compId && c.participantId === pid);
+        const count = pCatches.length;
+        const isOver = count >= comp.catchLimit;
+
+        details.innerHTML = `
+            <div class="catch-counter">
+                <div>
+                    <div class="catch-count-display ${isOver ? 'over-limit' : ''}">${count}</div>
+                    <div class="catch-limit-label">z ${comp.catchLimit} v ceně</div>
+                </div>
+            </div>
+            ${isOver ? `<div style="text-align:center;color:var(--danger);font-weight:600;margin-bottom:0.5rem;">
+                ⚠️ Nad limit – nutný příplatek!
+            </div>` : ''}
+            ${pCatches.length > 0 ? `
+                <div style="margin-top:0.5rem;">
+                    ${pCatches.map((c, i) => `
+                        <div class="catch-item">
+                            <span class="catch-number ${i >= comp.catchLimit ? 'over-limit' : ''}">${i + 1}</span>
+                            <div class="catch-info">
+                                <div class="catch-time">${formatTime(c.time)}${c.pond ? ' · ' + escHtml(c.pond) : ''}</div>
+                            </div>
+                            <button class="btn btn-danger btn-sm" onclick="window._removeCatch('${c.id}','${compId}')">✕</button>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+        `;
+    };
+
+    window._addCatch = function (compId) {
+        const sel = $(`#catch-participant-${compId}`);
+        if (!sel || !sel.value) { showToast('Vyberte závodníka', 'warning'); return; }
+
+        const pid = sel.value;
+        const comp = competitions.find(c => c.id === compId);
+        const p = participants.find(x => x.id === pid);
+        if (!comp || !p) return;
+
+        const currentCount = getParticipantCatchCount(compId, pid);
+
+        catches.push({
+            id: genId(),
+            competitionId: compId,
+            participantId: pid,
+            pond: '',
+            time: new Date().toISOString()
+        });
+        save(KEYS.CATCHES, catches);
+
+        const newCount = currentCount + 1;
+
+        if (newCount > comp.catchLimit) {
+            $('#payment-message').innerHTML = `
+                <strong>${escHtml(p.name)}</strong> má <strong>${newCount}. úlovek</strong>.<br>
+                Limit v ceně je <strong>${comp.catchLimit}</strong>.<br><br>
+                Závodník musí <strong>zaplatit příplatek</strong>!
+            `;
+            openModal(modalPayment);
+        } else if (newCount === comp.catchLimit) {
+            showToast(`${p.name}: ${newCount}. úlovek – poslední v ceně!`, 'warning');
+        } else {
+            showToast(`${p.name}: ${newCount}. úlovek zaznamenán`);
+        }
+
+        renderCatchesView();
+        renderCompetitions();
+    };
+
+    window._removeCatch = function (catchId, compId) {
+        if (!confirm('Odebrat tento úlovek?')) return;
+        catches = catches.filter(c => c.id !== catchId);
+        save(KEYS.CATCHES, catches);
+        renderCatchesView();
+        renderCompetitions();
+        showToast('Úlovek odebrán');
+    };
+
+    // _showCatchQr je definována níže (s kontrolou lokálního provozu)
+
+    function performCatchFromUrl(compId, pid) {
+        const comp = competitions.find(c => c.id === compId);
+        const p = participants.find(x => x.id === pid);
+        if (!comp || !p) { showToast('Závodník nebo závod nenalezen', 'danger'); return; }
+
+        const container = $('#catches-content');
+        const currentCount = getParticipantCatchCount(compId, pid);
+
+        container.innerHTML = `
+            <div class="action-card" style="text-align:center;">
+                <h3>🐟 Nahlásit úlovek</h3>
+                <p style="color:var(--text-secondary);margin:0.5rem 0;">${escHtml(comp.name)}</p>
+                <p style="font-size:1.2rem;font-weight:700;margin:0.75rem 0;">${escHtml(p.name)}</p>
+                <div class="catch-counter">
+                    <div>
+                        <div class="catch-count-display ${currentCount >= comp.catchLimit ? 'over-limit' : ''}">${currentCount}</div>
+                        <div class="catch-limit-label">aktuálně úlovků</div>
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-full" id="url-catch-btn">🐟 Zaznamenat úlovek</button>
+            </div>
+        `;
+
+        $('#url-catch-btn').addEventListener('click', () => {
+            const newCount = currentCount + 1;
+            catches.push({
+                id: genId(),
+                competitionId: compId,
+                participantId: pid,
+                pond: '',
+                time: new Date().toISOString()
+            });
+            save(KEYS.CATCHES, catches);
+
+            if (newCount > comp.catchLimit) {
+                $('#payment-message').innerHTML = `
+                    <strong>${escHtml(p.name)}</strong> má <strong>${newCount}. úlovek</strong>.<br>
+                    Limit v ceně je <strong>${comp.catchLimit}</strong>.<br><br>
+                    Závodník musí <strong>zaplatit příplatek</strong>!
+                `;
+                openModal(modalPayment);
+            } else {
+                showToast(`Úlovek č. ${newCount} zaznamenán!`);
+            }
+
+            window.history.replaceState({}, '', getBaseUrl());
+            setTimeout(() => renderCatchesView(), 500);
+        });
+    }
+
+    // ══════════════════════════════════════
+    // ── RESULTS / PŘEHLED ──
+    // ══════════════════════════════════════
+
     function renderResultsView() {
         const controls = $('#results-controls');
-        const noParticipants = $('#no-participants');
+        const noP = $('#no-participants');
         const actions = $('#results-actions');
 
         if (competitions.length === 0 || participants.length === 0) {
             controls.style.display = 'none';
             actions.style.display = 'none';
-            noParticipants.style.display = 'block';
+            noP.style.display = 'block';
             $('#participants-list').innerHTML = '';
             return;
         }
 
         controls.style.display = 'block';
-        noParticipants.style.display = 'none';
+        noP.style.display = 'none';
 
-        const select = $('#results-competition');
-        const currentVal = select.value;
-        const compsWithRegs = competitions.filter(c =>
-            participants.some(p => p.competitionId === c.id)
-        );
+        const sel = $('#results-competition');
+        const cur = sel.value;
+        const comps = competitions.filter(c => participants.some(p => p.competitionId === c.id));
 
-        select.innerHTML = compsWithRegs.map(c =>
+        sel.innerHTML = comps.map(c =>
             `<option value="${c.id}">${escHtml(c.name)} — ${formatDate(c.date)}</option>`
         ).join('');
 
-        if (compsWithRegs.find(c => c.id === currentVal)) {
-            select.value = currentVal;
-        }
+        if (comps.find(c => c.id === cur)) sel.value = cur;
 
-        select.onchange = () => renderParticipants(select.value);
-        renderParticipants(select.value);
+        sel.onchange = () => renderParticipants(sel.value);
+        renderParticipants(sel.value);
     }
 
     function renderParticipants(compId) {
         const list = $('#participants-list');
         const actions = $('#results-actions');
+        const comp = competitions.find(c => c.id === compId);
         const filtered = participants.filter(p => p.competitionId === compId);
 
         if (filtered.length === 0) {
-            list.innerHTML = '<div class="empty-state"><p>Žádní závodníci v tomto závodě.</p></div>';
+            list.innerHTML = '<div class="empty-state"><p>Žádní závodníci.</p></div>';
             actions.style.display = 'none';
             $('#results-stats').innerHTML = '';
             return;
@@ -392,110 +851,125 @@
 
         actions.style.display = 'flex';
 
-        const categories = {};
-        filtered.forEach(p => {
-            const cat = getCategoryLabel(p.category);
-            categories[cat] = (categories[cat] || 0) + 1;
-        });
+        const totalCatches = catches.filter(c => c.competitionId === compId).length;
+        const checkedInCount = new Set(
+            checkins.filter(ci => ci.competitionId === compId).map(ci => ci.participantId)
+        ).size;
+        const overLimitCount = filtered.filter(p =>
+            getParticipantCatchCount(compId, p.id) > (comp?.catchLimit || 2)
+        ).length;
 
         $('#results-stats').innerHTML = `
             <div class="stat-card">
                 <div class="stat-value">${filtered.length}</div>
-                <div class="stat-label">Celkem</div>
+                <div class="stat-label">Závodníků</div>
             </div>
-            ${Object.entries(categories).map(([cat, count]) => `
-                <div class="stat-card">
-                    <div class="stat-value">${count}</div>
-                    <div class="stat-label">${cat}</div>
-                </div>
-            `).join('')}
+            <div class="stat-card">
+                <div class="stat-value">${checkedInCount}</div>
+                <div class="stat-label">Přihlášeno</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${totalCatches}</div>
+                <div class="stat-label">Úlovků</div>
+            </div>
+            ${overLimitCount ? `
+            <div class="stat-card" style="border-color:var(--danger);">
+                <div class="stat-value" style="color:var(--danger);">${overLimitCount}</div>
+                <div class="stat-label">Příplatek</div>
+            </div>` : ''}
         `;
 
         const isMobile = window.innerWidth < 600;
 
         if (isMobile) {
-            list.innerHTML = filtered.map((p, i) => `
-                <div class="participant-card-mobile">
-                    <div class="pcm-name">${i + 1}. ${escHtml(p.name)}</div>
-                    <div class="pcm-meta">
-                        ${p.club ? escHtml(p.club) + ' · ' : ''}
-                        <span class="category-label">${getCategoryLabel(p.category)}</span>
-                        ${p.phone ? ' · ' + escHtml(p.phone) : ''}
+            list.innerHTML = filtered.map((p, i) => {
+                const cnt = getParticipantCatchCount(compId, p.id);
+                const isOver = cnt > (comp?.catchLimit || 2);
+                const isChecked = checkins.some(ci => ci.competitionId === compId && ci.participantId === p.id);
+                return `
+                    <div class="participant-card-mobile">
+                        <div class="pcm-name">
+                            ${i + 1}. ${escHtml(p.name)}
+                            ${isChecked ? '<span class="checkin-status checkin-done">✓ Přihlášen</span>' : ''}
+                        </div>
+                        <div class="pcm-meta">
+                            ${p.club ? escHtml(p.club) + ' · ' : ''}
+                            <span class="category-label">${getCategoryLabel(p.category)}</span>
+                        </div>
+                        <div class="pcm-catches" style="${isOver ? 'color:var(--danger)' : ''}">
+                            🐟 ${cnt} úlovků ${isOver ? '⚠️ PŘÍPLATEK' : ''}
+                        </div>
+                        <div class="pcm-actions">
+                            <button class="btn btn-danger btn-sm" onclick="window._removeParticipant('${p.id}')">Odebrat</button>
+                        </div>
                     </div>
-                    <div class="pcm-actions">
-                        <button class="btn btn-danger btn-sm" onclick="window._removeParticipant('${p.id}')">Odebrat</button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         } else {
             list.innerHTML = `
                 <table class="participants-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Jméno</th>
-                            <th>Spolek</th>
-                            <th>Kategorie</th>
-                            <th>Telefon</th>
-                            <th>E-mail</th>
-                            <th></th>
-                        </tr>
-                    </thead>
+                    <thead><tr>
+                        <th>#</th><th>Jméno</th><th>Spolek</th><th>Kategorie</th>
+                        <th>Check-in</th><th>Úlovky</th><th></th>
+                    </tr></thead>
                     <tbody>
-                        ${filtered.map((p, i) => `
-                            <tr>
+                        ${filtered.map((p, i) => {
+                            const cnt = getParticipantCatchCount(compId, p.id);
+                            const isOver = cnt > (comp?.catchLimit || 2);
+                            const isChecked = checkins.some(ci => ci.competitionId === compId && ci.participantId === p.id);
+                            return `<tr>
                                 <td>${i + 1}</td>
                                 <td><strong>${escHtml(p.name)}</strong></td>
                                 <td>${escHtml(p.club || '—')}</td>
                                 <td><span class="category-label">${getCategoryLabel(p.category)}</span></td>
-                                <td>${escHtml(p.phone || '—')}</td>
-                                <td>${escHtml(p.email || '—')}</td>
+                                <td>${isChecked ? '<span class="checkin-status checkin-done">✓</span>' : '<span class="checkin-status checkin-pending">—</span>'}</td>
+                                <td style="${isOver ? 'color:var(--danger);font-weight:700' : ''}">
+                                    ${cnt} ${isOver ? '⚠️' : ''}
+                                </td>
                                 <td class="actions-cell">
                                     <button class="btn btn-danger btn-sm" onclick="window._removeParticipant('${p.id}')">Odebrat</button>
                                 </td>
-                            </tr>
-                        `).join('')}
+                            </tr>`;
+                        }).join('')}
                     </tbody>
                 </table>
             `;
         }
     }
 
-    function getCategoryLabel(cat) {
-        const labels = { dospeli: 'Dospělí', mladez: 'Mládež', deti: 'Děti' };
-        return labels[cat] || cat;
-    }
-
     window._removeParticipant = function (id) {
         const p = participants.find(x => x.id === id);
-        if (!p) return;
-        if (!confirm(`Odebrat závodníka ${p.name}?`)) return;
-
+        if (!p || !confirm(`Odebrat závodníka ${p.name}?`)) return;
         participants = participants.filter(x => x.id !== id);
-        save(STORAGE_KEYS.PARTICIPANTS, participants);
+        checkins = checkins.filter(ci => ci.participantId !== id);
+        catches = catches.filter(c => c.participantId !== id);
+        save(KEYS.PARTICIPANTS, participants);
+        save(KEYS.CHECKINS, checkins);
+        save(KEYS.CATCHES, catches);
         renderResultsView();
         renderCompetitions();
         showToast('Závodník odebrán');
     };
 
-    // ── Export CSV ──
+    // ── CSV Export ──
     $('#btn-export-csv').addEventListener('click', () => {
         const compId = $('#results-competition').value;
         const comp = competitions.find(c => c.id === compId);
         const filtered = participants.filter(p => p.competitionId === compId);
-
         if (filtered.length === 0) return;
 
-        const headers = ['#', 'Jméno', 'Spolek', 'Kategorie', 'Telefon', 'E-mail', 'Poznámka'];
-        const rows = filtered.map((p, i) => [
-            i + 1,
-            p.name,
-            p.club || '',
-            getCategoryLabel(p.category),
-            p.phone || '',
-            p.email || '',
-            p.note || ''
-        ]);
+        const headers = ['#', 'Jméno', 'Spolek', 'Kategorie', 'Telefon', 'E-mail', 'Check-in', 'Úlovky', 'Nad limit'];
+        const rows = filtered.map((p, i) => {
+            const cnt = getParticipantCatchCount(compId, p.id);
+            const isChecked = checkins.some(ci => ci.competitionId === compId && ci.participantId === p.id);
+            return [
+                i + 1, p.name, p.club || '', getCategoryLabel(p.category),
+                p.phone || '', p.email || '',
+                isChecked ? 'Ano' : 'Ne',
+                cnt,
+                cnt > (comp?.catchLimit || 2) ? 'ANO' : ''
+            ];
+        });
 
         const bom = '\uFEFF';
         const csv = bom + [headers, ...rows].map(r =>
@@ -512,25 +986,142 @@
         showToast('CSV exportováno');
     });
 
-    $('#btn-print').addEventListener('click', () => {
-        window.print();
+    $('#btn-print').addEventListener('click', () => window.print());
+
+    // ── Nastavení URL ──
+    const modalSettings = $('#modal-settings');
+
+    function openSettings() {
+        const saved = localStorage.getItem(KEYS.BASE_URL) || '';
+        $('#settings-base-url').value = saved;
+        openModal(modalSettings);
+    }
+
+    $('#btn-open-settings').addEventListener('click', openSettings);
+    $('#modal-close-settings').addEventListener('click', () => closeModal(modalSettings));
+    $('#btn-banner-settings').addEventListener('click', openSettings);
+    modalSettings.addEventListener('click', (e) => { if (e.target === modalSettings) closeModal(modalSettings); });
+
+    $('#btn-save-settings').addEventListener('click', () => {
+        const url = $('#settings-base-url').value.trim();
+        if (url && !url.startsWith('http')) {
+            showToast('URL musí začínat https://', 'danger');
+            return;
+        }
+        localStorage.setItem(KEYS.BASE_URL, url);
+        closeModal(modalSettings);
+        updateLocalBanner();
+        showToast(url ? 'URL uložena – QR kódy jsou připraveny!' : 'URL odstraněna');
     });
 
-    // ── Helpers ──
-    function escHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+    function updateLocalBanner() {
+        const banner = $('#local-banner');
+        const savedUrl = localStorage.getItem(KEYS.BASE_URL);
+        if (isLocalFile() && !savedUrl) {
+            banner.style.display = 'flex';
+        } else {
+            banner.style.display = 'none';
+        }
     }
 
-    function slugify(str) {
-        return str.toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-|-$/g, '');
+    // Přepsat showQrCode aby varoval při lokálním provozu bez nastavené URL
+    const _origShowQrCode = showQrCode;
+
+    function showQrCodeSafe(title, url, subtitle) {
+        const savedUrl = localStorage.getItem(KEYS.BASE_URL);
+        if (isLocalFile() && !savedUrl) {
+            const body = $('#qr-body');
+            $('#modal-qr-title').textContent = title;
+            body.innerHTML = `
+                <div style="text-align:center;padding:1rem;">
+                    <div style="font-size:3rem;margin-bottom:0.75rem;">⚠️</div>
+                    <p style="font-weight:700;margin-bottom:0.5rem;">QR kód nelze vygenerovat</p>
+                    <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1rem;">
+                        Aplikace běží lokálně. Závodník by naskenoval cestu k vašemu počítači, která na jiném zařízení nefunguje.
+                    </p>
+                    <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1.25rem;">
+                        <strong>Řešení:</strong> Nasaďte aplikaci na GitHub Pages nebo Netlify a zadejte veřejnou URL v nastavení (⚙️).
+                    </p>
+                    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem;">
+                        Mezitím použijte <strong>manuální check-in</strong> v záložce Check-in.
+                    </p>
+                    <button class="btn btn-primary btn-full" onclick="document.getElementById('modal-qr').classList.remove('open');document.body.style.overflow='';document.getElementById('btn-open-settings').click();">
+                        ⚙️ Zadat veřejnou URL
+                    </button>
+                </div>
+            `;
+            openModal(modalQr);
+            return;
+        }
+        _origShowQrCode(title, url, subtitle);
     }
 
-    // ── Responsive re-render on resize ──
+    // Přepsat window._showPondQRs a _showCatchQr aby použily safe verzi
+    window._showPondQRs = function (id) {
+        const comp = competitions.find(c => c.id === id);
+        if (!comp) return;
+        closeModal(modalDetail);
+
+        if (comp.ponds.length === 0) {
+            showToast('Závod nemá definované rybníky', 'warning');
+            return;
+        }
+
+        const savedUrl = localStorage.getItem(KEYS.BASE_URL);
+        if (isLocalFile() && !savedUrl) {
+            showQrCodeSafe('QR check-in', '', '');
+            return;
+        }
+
+        const body = $('#qr-body');
+        $('#modal-qr-title').textContent = 'QR kódy – Check-in';
+        body.innerHTML = `<p style="margin-bottom:1rem;color:var(--text-secondary);font-size:0.9rem;">
+            Vytiskněte a umístěte ke každému rybníku. Závodník naskenuje a přihlásí se.
+        </p>`;
+
+        comp.ponds.forEach((pond, i) => {
+            const url = getBaseUrl() + '?action=checkin&comp=' + comp.id + '&pond=' + encodeURIComponent(pond);
+            const container = document.createElement('div');
+            container.style.cssText = 'margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border-light);';
+
+            const heading = document.createElement('h4');
+            heading.style.marginBottom = '0.5rem';
+            heading.textContent = '🏞️ ' + pond;
+            container.appendChild(heading);
+
+            const qrDiv = document.createElement('div');
+            qrDiv.id = 'qr-pond-' + i;
+            container.appendChild(qrDiv);
+
+            const urlDiv = document.createElement('div');
+            urlDiv.className = 'qr-url';
+            urlDiv.textContent = url;
+            container.appendChild(urlDiv);
+
+            body.appendChild(container);
+            setTimeout(() => makeQr(qrDiv, url, 220), 50);
+        });
+
+        openModal(modalQr);
+    };
+
+    window._showCatchQr = function (compId) {
+        const sel = $(`#catch-participant-${compId}`);
+        if (!sel || !sel.value) { showToast('Vyberte závodníka', 'warning'); return; }
+
+        const savedUrl = localStorage.getItem(KEYS.BASE_URL);
+        if (isLocalFile() && !savedUrl) {
+            showQrCodeSafe('QR úlovek', '', '');
+            return;
+        }
+
+        const comp = competitions.find(c => c.id === compId);
+        const p = participants.find(x => x.id === sel.value);
+        const url = getBaseUrl() + '?action=catch&comp=' + compId + '&pid=' + sel.value;
+        showQrCode('QR – Nahlášení úlovku', url, `${comp?.name || ''} – ${p?.name || ''}`);
+    };
+
+    // ── Resize re-render ──
     let resizeTimer;
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimer);
@@ -541,4 +1132,6 @@
 
     // ── Init ──
     renderCompetitions();
+    updateLocalBanner();
+    handleUrlAction();
 })();

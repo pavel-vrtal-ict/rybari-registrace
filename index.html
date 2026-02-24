@@ -5,13 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rybářské závody</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <header>
         <div class="header-content">
             <h1>🐟 Rybářské závody</h1>
-            <p class="subtitle">Registrace a organizace závodů</p>
+            <p class="subtitle">Registrace · Check-in · Úlovky</p>
         </div>
+        <button class="header-settings-btn" id="btn-open-settings" title="Nastavení URL pro QR kódy">⚙️</button>
     </header>
 
     <nav id="main-nav">
@@ -23,9 +25,17 @@
             <span class="nav-icon">📝</span>
             <span class="nav-label">Registrace</span>
         </button>
+        <button class="nav-btn" data-view="checkin">
+            <span class="nav-icon">📍</span>
+            <span class="nav-label">Check-in</span>
+        </button>
+        <button class="nav-btn" data-view="catches">
+            <span class="nav-icon">🐟</span>
+            <span class="nav-label">Úlovky</span>
+        </button>
         <button class="nav-btn" data-view="results">
             <span class="nav-icon">📊</span>
-            <span class="nav-label">Výsledky</span>
+            <span class="nav-label">Přehled</span>
         </button>
     </nav>
 
@@ -33,10 +43,9 @@
         <!-- ZÁVODY -->
         <section id="view-competitions" class="view active">
             <div class="section-header">
-                <h2>Nadcházející závody</h2>
+                <h2>Závody</h2>
                 <button class="btn btn-primary" id="btn-new-competition">+ Nový závod</button>
             </div>
-
             <div id="competitions-list" class="card-list"></div>
             <div id="no-competitions" class="empty-state">
                 <span class="empty-icon">🎣</span>
@@ -50,12 +59,10 @@
             <div class="section-header">
                 <h2>Registrace závodníka</h2>
             </div>
-
             <div id="no-competition-for-reg" class="empty-state">
                 <span class="empty-icon">📋</span>
                 <p>Nejdříve vytvořte závod.</p>
             </div>
-
             <form id="registration-form" class="form-card" style="display:none;">
                 <div class="form-group">
                     <label for="reg-competition">Závod</label>
@@ -93,12 +100,27 @@
             </form>
         </section>
 
-        <!-- VÝSLEDKY -->
+        <!-- CHECK-IN -->
+        <section id="view-checkin" class="view">
+            <div class="section-header">
+                <h2>Check-in u rybníka</h2>
+            </div>
+            <div id="checkin-content"></div>
+        </section>
+
+        <!-- ÚLOVKY -->
+        <section id="view-catches" class="view">
+            <div class="section-header">
+                <h2>Nahlásit úlovek</h2>
+            </div>
+            <div id="catches-content"></div>
+        </section>
+
+        <!-- PŘEHLED -->
         <section id="view-results" class="view">
             <div class="section-header">
-                <h2>Registrovaní závodníci</h2>
+                <h2>Přehled závodníků</h2>
             </div>
-
             <div id="results-controls" style="display:none;">
                 <div class="form-group">
                     <label for="results-competition">Závod</label>
@@ -106,14 +128,11 @@
                 </div>
                 <div class="results-stats" id="results-stats"></div>
             </div>
-
             <div id="participants-list" class="participants-table-wrap"></div>
-
             <div id="no-participants" class="empty-state">
                 <span class="empty-icon">👥</span>
                 <p>Zatím žádní registrovaní závodníci.</p>
             </div>
-
             <div id="results-actions" style="display:none;">
                 <button class="btn btn-secondary" id="btn-export-csv">📥 Export CSV</button>
                 <button class="btn btn-secondary" id="btn-print">🖨️ Tisk</button>
@@ -150,6 +169,16 @@
                     <input type="number" id="comp-max" min="1" value="50">
                 </div>
                 <div class="form-group">
+                    <label for="comp-ponds">Rybníky (stanoviště)</label>
+                    <input type="text" id="comp-ponds" placeholder="Velký rybník, Malý rybník, Jezero">
+                    <small class="form-hint">Oddělte čárkou. Každý rybník dostane vlastní QR kód pro check-in.</small>
+                </div>
+                <div class="form-group">
+                    <label for="comp-catch-limit">Počet úlovků v ceně (pak příplatek)</label>
+                    <input type="number" id="comp-catch-limit" min="1" value="2">
+                    <small class="form-hint">Po překročení tohoto počtu musí závodník doplatit.</small>
+                </div>
+                <div class="form-group">
                     <label for="comp-desc">Popis / pravidla</label>
                     <textarea id="comp-desc" rows="3" placeholder="Pravidla závodu, povolené nástrahy..."></textarea>
                 </div>
@@ -160,13 +189,66 @@
 
     <!-- MODAL: Detail závodu -->
     <div id="modal-detail" class="modal-overlay">
-        <div class="modal">
+        <div class="modal modal-wide">
             <div class="modal-header">
                 <h3>Detail závodu</h3>
                 <button class="modal-close" id="modal-close-detail">&times;</button>
             </div>
             <div id="competition-detail-body"></div>
         </div>
+    </div>
+
+    <!-- MODAL: QR kód -->
+    <div id="modal-qr" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-qr-title">QR kód</h3>
+                <button class="modal-close" id="modal-close-qr">&times;</button>
+            </div>
+            <div id="qr-body" class="qr-body"></div>
+        </div>
+    </div>
+
+    <!-- MODAL: Notifikace příplatek -->
+    <div id="modal-payment" class="modal-overlay">
+        <div class="modal modal-alert">
+            <div class="payment-alert">
+                <span class="payment-icon">💰</span>
+                <h3>Příplatek za úlovek!</h3>
+                <p id="payment-message"></p>
+                <button class="btn btn-primary btn-full" id="btn-payment-ok">Rozumím</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Nastavení URL pro QR kódy -->
+    <div id="modal-settings" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>⚙️ Nastavení URL pro QR kódy</h3>
+                <button class="modal-close" id="modal-close-settings">&times;</button>
+            </div>
+            <div style="margin-bottom:1rem;padding:0.85rem;background:var(--warning-light);border-radius:var(--radius-sm);border:1px solid var(--warning);font-size:0.9rem;">
+                <strong>Proč je to potřeba?</strong><br>
+                QR kód musí odkazovat na veřejnou webovou adresu, aby ho závodník mohl naskenovat mobilem.
+                Lokální cesta <code>file://</code> na jiném zařízení nefunguje.
+            </div>
+            <div class="form-group">
+                <label for="settings-base-url">Veřejná URL adresa aplikace</label>
+                <input type="url" id="settings-base-url" placeholder="https://vas-github.github.io/rybari-registrace/">
+                <small class="form-hint">
+                    Zadejte adresu po nasazení na GitHub Pages nebo Netlify.<br>
+                    Dokud nemáte veřejnou URL, použijte manuální check-in v záložce Check-in.
+                </small>
+            </div>
+            <button class="btn btn-primary btn-full" id="btn-save-settings">Uložit</button>
+        </div>
+    </div>
+
+    <!-- BANNER: lokální provoz -->
+    <div id="local-banner" class="local-banner" style="display:none;">
+        ⚠️ Aplikace běží lokálně – QR kódy nefungují.
+        <button class="btn btn-sm" id="btn-banner-settings" style="margin-left:0.75rem;background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);">Zadat URL</button>
     </div>
 
     <!-- TOAST -->
