@@ -67,7 +67,7 @@ header .subtitle { font-size: 0.8rem; opacity: .85; margin-top: .1rem; }
     background: transparent; color: inherit; font-size: .75rem; font-weight: 700; cursor: pointer;
 }
 
-/* ── NAV ── */
+/* ── NAV (5 tlačítek) ── */
 nav {
     display: flex;
     background: var(--surface);
@@ -75,12 +75,12 @@ nav {
     box-shadow: var(--shadow-sm);
 }
 .nav-btn {
-    flex: 1; display: flex; flex-direction: column; align-items: center; gap: .15rem;
-    padding: .55rem .25rem; border: none; background: transparent;
-    color: var(--text-secondary); font-size: .65rem; font-weight: 500; cursor: pointer;
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: .1rem;
+    padding: .45rem .15rem; border: none; background: transparent;
+    color: var(--text-secondary); font-size: .6rem; font-weight: 500; cursor: pointer;
     transition: all .2s; border-bottom: 3px solid transparent;
 }
-.nav-btn .nav-icon { font-size: 1.2rem; }
+.nav-btn .nav-icon { font-size: 1.1rem; }
 .nav-btn.active  { color: var(--primary); border-bottom-color: var(--primary); background: var(--surface-alt); }
 .nav-btn:hover   { background: var(--surface-alt); }
 
@@ -115,19 +115,64 @@ main { max-width: 640px; margin: 0 auto; padding: 1rem; }
 
 /* ── CARDS ── */
 .card-list { display: flex; flex-direction: column; gap: .65rem; }
-.card {
-    background: var(--surface); border-radius: var(--radius); padding: 1rem;
-    box-shadow: var(--shadow-sm); border: 1px solid var(--border-light);
-    transition: box-shadow .2s, transform .2s;
+
+/* ── INLINE FORM (formulář přímo ve view) ── */
+.inline-form {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 1rem;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1.25rem;
 }
-.card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
-.card-title { font-size: 1rem; font-weight: 700; margin-bottom: .4rem; }
-.card-meta  { display: flex; flex-wrap: wrap; gap: .6rem; font-size: .83rem; color: var(--text-secondary); }
-.card-footer {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-top: .65rem; padding-top: .65rem; border-top: 1px solid var(--border-light);
+
+/* ── FORM LAYOUT ── */
+.form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .65rem;
 }
-.card-actions { display: flex; gap: .4rem; flex-wrap: wrap; }
+.form-group-vcenter {
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: .15rem;
+}
+
+/* ── CHECKBOX LABEL ── */
+.check-label {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .9rem;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+}
+.check-label input[type="checkbox"] {
+    width: 18px; height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* ── VISITOR FEE ROW ── */
+.visit-fee-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-bottom: .85rem;
+    padding: .65rem .75rem;
+    background: var(--surface-alt);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light);
+}
+.visit-fee-display {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--primary);
+    white-space: nowrap;
+}
 
 /* ── FISHER CARD ── */
 .fisher-card {
@@ -145,7 +190,7 @@ main { max-width: 640px; margin: 0 auto; padding: 1rem; }
 .fisher-sub  { font-size: .78rem; color: var(--text-secondary); }
 .fisher-actions { display: flex; gap: .4rem; flex-shrink: 0; }
 
-/* ── CHECKIN OVERLAY (QR landing) ── */
+/* ── REGISTRAČNÍ OVERLAY (QR landing) ── */
 .checkin-overlay {
     position: fixed; inset: 0; background: linear-gradient(160deg, var(--primary-dark), var(--primary));
     z-index: 500; display: flex; align-items: center; justify-content: center; padding: 1.5rem;
@@ -159,27 +204,6 @@ main { max-width: 640px; margin: 0 auto; padding: 1rem; }
 .checkin-fish-icon { font-size: 3.5rem; display: block; margin-bottom: .5rem; }
 .checkin-card h2  { font-size: 1.5rem; color: var(--primary); margin-bottom: .25rem; }
 .checkin-location { font-size: .95rem; color: var(--text-secondary); }
-.checkin-time     { font-size: .9rem; color: var(--text-secondary); margin-top: .2rem; }
-.checkin-status-msg {
-    margin: .85rem 0; padding: .65rem 1rem; border-radius: var(--radius-sm);
-    font-weight: 600; font-size: .95rem;
-}
-.status-new      { background: #e6f4ea; color: var(--success); }
-.status-already  { background: #fff3cd; color: #856404; }
-
-.catch-quick-form { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border-light); }
-.catch-quick-form h3 { font-size: 1rem; margin-bottom: .75rem; }
-.length-input-wrap { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; }
-.length-input {
-    flex: 1; padding: .7rem; border: 2px solid var(--border); border-radius: var(--radius-sm);
-    font-size: 1.4rem; font-weight: 700; text-align: center; color: var(--primary);
-    -webkit-appearance: none; appearance: none;
-}
-.length-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,107,60,.12); }
-.length-unit { font-size: 1.1rem; font-weight: 600; color: var(--text-secondary); }
-.length-hint { font-size: .82rem; font-weight: 600; margin-bottom: .65rem; min-height: 1.2em; }
-.hint-ok      { color: var(--success); }
-.hint-outside { color: var(--danger); }
 
 /* ── DOCHÁZKA ── */
 .day-group { margin-bottom: 1.25rem; }
@@ -206,11 +230,31 @@ main { max-width: 640px; margin: 0 auto; padding: 1rem; }
 .catch-row-info  { flex: 1; }
 .catch-row-name  { font-weight: 600; font-size: .9rem; }
 .catch-row-meta  { font-size: .78rem; color: var(--text-secondary); }
-.catch-length    {
+.catch-length {
     font-size: 1rem; font-weight: 800; color: var(--primary);
     background: #e6f4ea; padding: .2rem .6rem; border-radius: 100px;
 }
 .catch-length.outside { background: var(--danger-light); color: var(--danger); }
+.catch-kept-badge {
+    font-size: .72rem; font-weight: 700; color: var(--warning);
+    background: var(--warning-light); padding: .15rem .55rem; border-radius: 100px;
+    white-space: nowrap;
+}
+
+/* ── NÁVŠTĚVY ── */
+.visit-row {
+    display: flex; align-items: center; gap: .75rem;
+    padding: .6rem .75rem; background: var(--surface); border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light); margin-bottom: .3rem;
+}
+.visit-row-main  { flex: 1; min-width: 0; }
+.visit-row-name  { font-weight: 600; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.visit-row-meta  { font-size: .78rem; color: var(--text-secondary); }
+.visit-fee-badge {
+    font-size: .88rem; font-weight: 800; color: var(--primary);
+    background: #e6f4ea; padding: .2rem .65rem; border-radius: 100px;
+    white-space: nowrap; flex-shrink: 0;
+}
 
 /* ── STATISTIKY ── */
 .year-select {
@@ -222,11 +266,11 @@ main { max-width: 640px; margin: 0 auto; padding: 1rem; }
     display: flex; gap: .65rem; flex-wrap: wrap; margin-bottom: 1rem;
 }
 .stat-card {
-    flex: 1; min-width: 80px; background: var(--surface); border-radius: var(--radius-sm);
+    flex: 1; min-width: 72px; background: var(--surface); border-radius: var(--radius-sm);
     padding: .75rem; text-align: center; border: 1px solid var(--border-light); box-shadow: var(--shadow-sm);
 }
-.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
-.stat-label { font-size: .72rem; color: var(--text-secondary); margin-top: .05rem; }
+.stat-value { font-size: 1.35rem; font-weight: 700; color: var(--primary); }
+.stat-label { font-size: .7rem; color: var(--text-secondary); margin-top: .05rem; }
 
 .fisher-stats-card {
     background: var(--surface); border-radius: var(--radius); padding: 1rem;
@@ -240,15 +284,11 @@ main { max-width: 640px; margin: 0 auto; padding: 1rem; }
 .fsc-bar-track { flex: 1; height: 8px; background: var(--border-light); border-radius: 4px; overflow: hidden; }
 .fsc-bar-fill  { height: 100%; background: var(--primary); border-radius: 4px; transition: width .4s; }
 .fsc-bar-fill.catches { background: var(--accent); }
-.fsc-bar-val   { min-width: 24px; text-align: right; font-weight: 600; color: var(--text); }
+.fsc-bar-val   { min-width: 60px; text-align: right; font-weight: 600; color: var(--text); }
 
 /* ── QR ── */
 .qr-body { text-align: center; padding: .75rem 0; }
 .qr-body canvas, .qr-body img { max-width: 260px; width: 100%; height: auto; }
-#qr-canvas, [id^="qr-"] { display: flex; justify-content: center; margin: 0 auto; }
-.qr-label { margin-top: .65rem; font-size: .88rem; color: var(--text-secondary); }
-.qr-url   { margin-top: .4rem; font-size: .7rem; color: var(--text-secondary); word-break: break-all;
-            padding: .4rem; background: var(--surface-alt); border-radius: var(--radius-sm); }
 
 /* ── MODALS ── */
 .modal-overlay {
@@ -282,7 +322,9 @@ main { max-width: 640px; margin: 0 auto; padding: 1rem; }
     -webkit-appearance: none; appearance: none;
 }
 .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,107,60,.12); }
-.form-hint { display: block; font-size: .76rem; color: var(--text-secondary); margin-top: .22rem; }
+.form-hint { display: block; font-size: .76rem; font-weight: 600; margin-top: .22rem; min-height: 1.1em; }
+.hint-ok      { color: var(--success); }
+.hint-outside { color: var(--danger); }
 
 /* ── EMPTY STATE ── */
 .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--text-secondary); }
@@ -316,14 +358,15 @@ main { max-width: 640px; margin: 0 auto; padding: 1rem; }
 }
 @media (min-width: 640px) {
     header h1 { font-size: 1.6rem; }
-    .nav-btn { flex-direction: row; gap: .4rem; padding: .7rem 1rem; font-size: .88rem; }
+    .nav-btn { flex-direction: row; gap: .4rem; padding: .65rem .75rem; font-size: .82rem; }
+    .nav-btn .nav-icon { font-size: 1.1rem; }
     main { padding: 1.5rem; }
 }
 
 /* ── PRINT ── */
 @media print {
-    header, nav, .btn, .modal-overlay, .toast, .sync-bar { display: none !important; }
+    header, nav, .btn, .modal-overlay, .toast, .sync-bar, .inline-form { display: none !important; }
     body { padding: 0; background: #fff; }
     .view, .view.active { display: block !important; }
-    #view-rybari, #view-dochazka, #view-ulovky { display: none !important; }
+    #view-rybari, #view-dochazka, #view-ulovky, #view-navstevy { display: none !important; }
 }

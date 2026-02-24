@@ -38,6 +38,10 @@
             <span class="nav-icon">🐟</span>
             <span class="nav-label">Úlovky</span>
         </button>
+        <button class="nav-btn" data-view="navstevy">
+            <span class="nav-icon">👥</span>
+            <span class="nav-label">Návštěvy</span>
+        </button>
         <button class="nav-btn" data-view="statistiky">
             <span class="nav-icon">📊</span>
             <span class="nav-label">Statistiky</span>
@@ -50,21 +54,36 @@
         <section id="view-rybari" class="view active">
             <div class="section-header">
                 <h2>Rybáři</h2>
-                <button class="btn btn-primary" id="btn-new-fisher">+ Přidat</button>
+                <div style="display:flex;gap:.5rem;">
+                    <button class="btn btn-secondary btn-sm" id="btn-reg-qr">📱 QR registrace</button>
+                    <button class="btn btn-primary" id="btn-new-fisher">+ Přidat</button>
+                </div>
             </div>
             <div id="fishers-list" class="card-list"></div>
             <div id="no-fishers" class="empty-state">
                 <span class="empty-icon">👤</span>
                 <p>Zatím nejsou přidáni žádní rybáři.</p>
-                <p class="hint">Klikněte na „+ Přidat" pro registraci.</p>
+                <p class="hint">Klikněte na „+ Přidat" nebo vyvěste QR kód pro registraci.</p>
             </div>
         </section>
 
         <!-- DOCHÁZKA -->
         <section id="view-dochazka" class="view">
             <div class="section-header">
-                <h2>Dnešní docházka</h2>
-                <button class="btn btn-secondary btn-sm" id="btn-manual-checkin">+ Ruční záznam</button>
+                <h2>Docházka</h2>
+            </div>
+            <div class="inline-form">
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="ci-fisher">Rybář</label>
+                        <select id="ci-fisher"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ci-date">Datum</label>
+                        <input type="date" id="ci-date">
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-full" id="btn-ci-submit">✓ Zapsat příchod</button>
             </div>
             <div id="dochazka-content"></div>
         </section>
@@ -74,7 +93,65 @@
             <div class="section-header">
                 <h2>Úlovky</h2>
             </div>
+            <div class="inline-form">
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="catch-fisher">Rybář</label>
+                        <select id="catch-fisher"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="catch-date">Datum</label>
+                        <input type="date" id="catch-date">
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="catch-length">Délka kapra (cm)</label>
+                        <input type="number" id="catch-length" min="10" max="120" placeholder="např. 52">
+                        <span class="form-hint" id="catch-length-hint"></span>
+                    </div>
+                    <div class="form-group form-group-vcenter">
+                        <label class="check-label">
+                            <input type="checkbox" id="catch-kept">
+                            <span>Vzal rybu domů</span>
+                        </label>
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-full" id="btn-catch-submit">🐟 Zapsat úlovek</button>
+            </div>
             <div id="ulovky-content"></div>
+        </section>
+
+        <!-- NÁVŠTĚVY -->
+        <section id="view-navstevy" class="view">
+            <div class="section-header">
+                <h2>Návštěvy</h2>
+            </div>
+            <div class="inline-form">
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="visit-fisher">Člen (kdo pozval)</label>
+                        <select id="visit-fisher"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="visit-date">Datum</label>
+                        <input type="date" id="visit-date">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="visit-name">Jméno návštěvy</label>
+                    <input type="text" id="visit-name" placeholder="Jméno hosta">
+                </div>
+                <div class="visit-fee-row">
+                    <label class="check-label">
+                        <input type="checkbox" id="visit-carp">
+                        <span>Vzal kapra (+400 Kč)</span>
+                    </label>
+                    <div class="visit-fee-display" id="visit-fee-display">300 Kč</div>
+                </div>
+                <button class="btn btn-primary btn-full" id="btn-visit-submit">👥 Zapsat návštěvu</button>
+            </div>
+            <div id="navstevy-content"></div>
         </section>
 
         <!-- STATISTIKY -->
@@ -88,33 +165,31 @@
 
     </main>
 
-    <!-- PŘÍCHOD (přes QR) – fullscreen overlay -->
-    <div id="checkin-overlay" class="checkin-overlay" style="display:none;">
+    <!-- REGISTRACE – fullscreen overlay po naskenování QR -->
+    <div id="reg-overlay" class="checkin-overlay" style="display:none;">
         <div class="checkin-card">
             <div class="checkin-fish-icon">🎣</div>
-            <h2 id="co-fisher-name">Rybář</h2>
-            <p class="checkin-location">📍 Hlybuček</p>
-            <p class="checkin-time" id="co-time"></p>
-            <div class="checkin-status-msg" id="co-status"></div>
-
-            <div class="catch-quick-form" id="co-catch-form">
-                <h3>Přidat úlovek?</h3>
-                <div class="length-input-wrap">
-                    <input type="number" id="co-catch-length" min="10" max="120"
-                        placeholder="délka cm" class="length-input">
-                    <span class="length-unit">cm</span>
+            <h2>Hlybuček</h2>
+            <p class="checkin-location">📍 Registrace nového člena</p>
+            <form id="reg-form" style="text-align:left;margin-top:1.1rem;">
+                <div class="form-group">
+                    <label for="reg-name">Jméno a příjmení</label>
+                    <input type="text" id="reg-name" placeholder="Jan Novák" required>
                 </div>
-                <div id="co-length-hint" class="length-hint"></div>
-                <button class="btn btn-primary btn-full" id="co-catch-btn">🐟 Zapsat úlovek</button>
-            </div>
-
-            <button class="btn btn-secondary btn-full" id="co-close-btn" style="margin-top:0.75rem;">
-                Zavřít
-            </button>
+                <div class="form-group">
+                    <label for="reg-number">Číslo rybářského lístku</label>
+                    <input type="text" id="reg-number" placeholder="12345">
+                </div>
+                <div class="form-group">
+                    <label for="reg-phone">Telefon</label>
+                    <input type="tel" id="reg-phone" placeholder="+420 123 456 789">
+                </div>
+                <button type="submit" class="btn btn-primary btn-full" style="margin-top:.5rem;">Zaregistrovat se</button>
+            </form>
         </div>
     </div>
 
-    <!-- MODAL: Přidat rybáře -->
+    <!-- MODAL: Přidat / upravit rybáře -->
     <div id="modal-fisher" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
@@ -139,33 +214,19 @@
         </div>
     </div>
 
-    <!-- MODAL: QR kód rybáře -->
+    <!-- MODAL: QR kód pro registraci nových členů -->
     <div id="modal-qr" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3 id="modal-qr-title">Osobní QR kód</h3>
+                <h3>📱 QR kód – registrace členů</h3>
                 <button class="modal-close" id="modal-close-qr">&times;</button>
             </div>
-            <div id="qr-body" class="qr-body"></div>
-        </div>
-    </div>
-
-    <!-- MODAL: Ruční záznam docházky -->
-    <div id="modal-manual" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Ruční záznam příchodu</h3>
-                <button class="modal-close" id="modal-close-manual">&times;</button>
+            <div class="qr-body">
+                <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:.75rem;text-align:center;">
+                    Nový člen naskenuje kód a vyplní registrační formulář. Vyvěste na nástěnce u rybníka.
+                </p>
+                <div id="qr-canvas-wrap" style="display:flex;justify-content:center;"></div>
             </div>
-            <div class="form-group">
-                <label for="manual-fisher">Rybář</label>
-                <select id="manual-fisher"></select>
-            </div>
-            <div class="form-group">
-                <label for="manual-date">Datum</label>
-                <input type="date" id="manual-date">
-            </div>
-            <button class="btn btn-primary btn-full" id="btn-save-manual">Zapsat příchod</button>
         </div>
     </div>
 
